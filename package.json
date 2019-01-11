@@ -461,7 +461,7 @@
       "resolved": "https://registry.npmjs.org/caseless/-/caseless-0.12.0.tgz",
       "version": "0.12.0"
     },
-    "ccxt": "ccxt/ccxt#master",
+    "chai": "^4.2.0",
     "chalk": {
       "integrity": "sha1-qBFcVeSnAv5NFQq9OHKCKn4J/Jg=",
       "requires": {
@@ -2202,6 +2202,7 @@
       "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.11.tgz",
       "version": "4.17.11"
     },
+    "log4js": "^3.0.6",
     "lowercase-keys": {
       "integrity": "sha512-G2Lj61tXDnVFFOi8VZds+SoQjtQC3dgokKdDG2mTm1tx4m50NUHBOZSBwQQHyy0V12A0JTG4icfZQH+xPyh8VA==",
       "resolved": "https://registry.npmjs.org/lowercase-keys/-/lowercase-keys-1.0.1.tgz",
@@ -2360,11 +2361,7 @@
       "resolved": "https://registry.npmjs.org/mock-fs/-/mock-fs-4.7.0.tgz",
       "version": "4.7.0"
     },
-    "moment": {
-      "integrity": "sha512-3IE39bHVqFbWWaPOMHZF98Q9c3LDKGTmypMiTM2QygGXXElkFWIH7GxfmlwmY2vwa+wmNsoYZmG2iusf1ZjJoA==",
-      "resolved": "https://registry.npmjs.org/moment/-/moment-2.23.0.tgz",
-      "version": "2.23.0"
-    },
+    "moment": "^2.23.0",
     "mout": {
       "integrity": "sha1-ujYR318OWx/7/QEWa48C0fX6K5k=",
       "resolved": "https://registry.npmjs.org/mout/-/mout-0.11.1.tgz",
@@ -3589,6 +3586,7 @@
       "resolved": "http://registry.npmjs.org/string_decoder/-/string_decoder-1.1.1.tgz",
       "version": "1.1.1"
     },
+    "stringify": "^5.2.0",
     "strip-ansi": {
       "integrity": "sha1-ajhfuIU9lS1f8F0Oiq+UJ43GPc8=",
       "requires": {

@@ -8,7 +8,6 @@ const config = require('config')
   , util = require('util')
 ;
 
-const FILE = "withdraw.json";
 var filename = path.basename(__filename);
 var logStdout = process.stdout;
 var logStderr = process.stderr;
@@ -30,10 +29,11 @@ Map.prototype.toJSON = function () {
 }
 */
 
-let amount = 0.00040481;
 (async function main() {
   const rl = new RLSEPP();
   var apiCreds = config.get('gekko.multitrader');
-  await rl.init(apiCreds, {verbose});
+  await rl.initAsync(apiCreds, {verbose});
+//  console.json(rl.e);
+
   await rl.showBalances()
 })()
