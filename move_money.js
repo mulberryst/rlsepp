@@ -23,7 +23,6 @@ Map.prototype.toJSON = function () {
     return obj
 }
 */
- -la
 // gemini : "result":"error","reason":"CryptoAddressWhitelistsNotEnabled","message":"Cryptocurrency withdrawal address whitelists are not enabled for account 908793.  Please contact support@gemini.com for information on setting up a withdrawal address whitelist."} (possible reasons: invalid API keys, bad or old nonce, exchange is down or offline, on maintenance, DDoS protection, rate-limiting)
 
 //let srcAddress = config.withdraw.gdax.ETH.address
@@ -36,14 +35,14 @@ logger.info(filename + " BEGIN ");
 (async function main() {
   const rl = new RLSEPP();
   var apiCreds = config.get('gekko.multitrader');
-  await rl.init(apiCreds, {verbose});
+  await rl.initAsync(apiCreds, {verbose});
   try {
     await rl.showBalances()
   } catch(e) {
     logger.error(e)
   };
   try {
-    const r = await rl.moveMoneyAsync('LTC', amount, 'gemini', 'gdax')
+    const r = await rl.moveMoneyAsync('LTC', amount, 'gemini', 'binance')
     await rl.showBalances()
   } catch(e) {
     logger.error(e)

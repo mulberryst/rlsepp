@@ -33,6 +33,7 @@ Map.prototype.toJSON = function () {
   const rl = new RLSEPP();
   var apiCreds = config.get('gekko.multitrader');
   await rl.initAsync(apiCreds, {verbose});
+  console.log("show_balance, exchanges initialized")
 //  console.json(rl.e);
 
   await rl.showBalances()
