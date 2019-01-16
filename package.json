@@ -2531,6 +2531,7 @@
       "resolved": "https://registry.npmjs.org/number-to-bn/-/number-to-bn-1.7.0.tgz",
       "version": "1.7.0"
     },
+    "numeral": "^2.0.6",
     "oargv": {
       "integrity": "sha512-24Eatdf7OGezTAU0Yw3HaoO9x+GTFnmBkuFHfWEQtVsIKbD7VMHhyIlDMtxxUxfZKPBPHYsTo8UgGwKr4ySewA==",
       "requires": {

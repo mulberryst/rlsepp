@@ -43,7 +43,6 @@ logger.info(filename + " BEGIN ");
   };
   try {
     const r = await rl.moveMoneyAsync('LTC', amount, 'gemini', 'binance')
-    await rl.showBalances()
   } catch(e) {
     logger.error(e)
   };

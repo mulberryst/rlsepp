@@ -6,6 +6,7 @@ const config = require('config')
   , fs = require("fs")
   , path = require('path')
   , util = require('util')
+  , asTable = require ('as-table').configure ({ title: x => x.bright, delimiter: ' | '.dim.cyan, dash: '-'.bright.cyan })
 ;
 
 var filename = path.basename(__filename);
@@ -33,8 +34,14 @@ Map.prototype.toJSON = function () {
   const rl = new RLSEPP();
   var apiCreds = config.get('gekko.multitrader');
   await rl.initAsync(apiCreds, {verbose});
-  console.log("show_balance, exchanges initialized")
 //  console.json(rl.e);
 
-  await rl.showBalances()
+/*
+  const apiBalances = await rl.fetchBalances();
+  const table = rl.balancesToTable(apiBalances);
+  let printNice = asTable(sortBy(table, Object.values(table), 'value'))
+  console.log(printNice)
+  */
+  await rl.showBalances();
+  await rl.showDerivedWallet();
 })()
