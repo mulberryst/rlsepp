@@ -7,6 +7,7 @@ const config = require('config')
   , path = require('path')
   , util = require('util')
   , asTable = require ('as-table').configure ({ title: x => x.bright, delimiter: ' | '.dim.cyan, dash: '-'.bright.cyan })
+  , asTableLog = require ('as-table').configure ({ title: x => x, delimiter: ' | ', dash: '-' })
 ;
 
 var filename = path.basename(__filename);
@@ -32,16 +33,37 @@ Map.prototype.toJSON = function () {
 
 (async function main() {
   const rl = new RLSEPP();
-  var apiCreds = config.get('gekko.pathing');
+  var apiCreds = config.get('gekko.pathingtest');
   await rl.initAsync(apiCreds, {verbose});
 //  console.json(rl.e);
 
 /*
   const apiBalances = await rl.fetchBalances();
-  const table = rl.balancesToTable(apiBalances);
   let printNice = asTable(sortBy(table, Object.values(table), 'value'))
   console.log(printNice)
   */
-  await rl.showBalances();
-  await rl.showDerivedWallet();
+  //let printNice = asTable(sortBy(symbolHistogram.keys()
+//    , Object.values(table), 'value'))
+//  let table = rl.arbitrableCommodities().asTable()
+//  console.log( asTable( table ) )
+
+  table = await rl.fetchArbitrableTickers(rl.arbitrableCommodities())
+  //console.log( table )
+  let spreads = await rl.deriveSpreads( table )
+  for (let spread of spreads) {
+    if (spread.tickers.size() > 1) {
+      console.log( spread.strip() )
+    }
+  }
+//  console.log(asTableLog( spreads.asTable() ))
+//  asTable.configure ({ print: x => (typeof x === 'boolean') ? (x ? 'yes' : 'no') : String (x) }) (data)
+
+  /*
+  for (let r of ixDict) {
+    console.log(r.name)
+    let tickerTable = r.tickers
+    rl.showTickers(tickerTable)
+  }
+  */
+//  await rl.showDerivedWallet();
 })()
