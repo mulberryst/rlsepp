@@ -27,9 +27,11 @@ console.debug = function () { logStderr.write(util.format.apply(null, arguments)
 console.error = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
 console.log = function () {
   logStdout.write(util.format.apply(null, arguments) + '\n');
-  logFile2.write(util.format.apply(null, arguments) + '\n');
 };
 console.spread = function () { logFile.write(util.format.apply(null, arguments) + '\n'); };
+console.paths = function () {
+  logFile2.write(util.format.apply(null, arguments) + '\n');
+};
 console.info = function () { logStdout.write(util.format.apply(null, arguments) + '\n'); };
 
 console.log("Ensure that Crypto/Crypto quotes from exchanges are actually representing the quote currency!")
@@ -202,10 +204,10 @@ const sortBy = (array, key, descending = false) => {
     for (let n of path) {
       let a = n.model.action
       if (typeof a !== 'undefined')
-        console.log("%s [%d] %s on %s for [%d] %s at [%d]",
+        console.paths("%s [%d] %s on %s for [%d] %s at [%d]",
           a.action, a.amount, a.amountType, a.exchange, a.cost, a.costType, a.price)
     }
-    console.log("result in USD: ",node.model.wallet.USD.value)
+    console.paths("result in USD: ",node.model.wallet.USD.value)
   }
 
 
