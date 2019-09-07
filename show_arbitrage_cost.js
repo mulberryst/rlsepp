@@ -20,8 +20,8 @@ var filename = path.basename(__filename);
 var logStdout = process.stdout;
 var logStderr = process.stderr;
 var now = moment()
-var logFile = fs.createWriteStream('log/' + filename+'.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
-var logFile2 = fs.createWriteStream('log/synopsis.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
+var logFile = fs.createWriteStream('/home/nathaniel/log/' + filename+'.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
+var logFile2 = fs.createWriteStream('/home/nathaniel/log/synopsis.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
 
 console.debug = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
 console.error = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
