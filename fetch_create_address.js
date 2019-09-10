@@ -1,6 +1,6 @@
 'use strict';
 const config = require('config')
-  , RLSEPP = require('./librlsepp/js/lib/rlsepp').Rlsepp
+  , RLSEPP = require('./librlsepp').Rlsepp
   , verbose = process.argv.includes('--verbose')
   , debug = process.argv.includes('--debug')
   , fs = require("fs")

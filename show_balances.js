@@ -1,6 +1,6 @@
 'use strict';
 const config = require('config')
-  , RLSEPP = require('./librlsepp/js/lib/rlsepp').Rlsepp
+  , RLSEPP = require('./librlsepp').Rlsepp
   , verbose = process.argv.includes('--verbose')
   , debug = process.argv.includes('--debug')
   , fs = require("fs")
@@ -32,7 +32,7 @@ Map.prototype.toJSON = function () {
 
 (async function main() {
   const rl = new RLSEPP();
-  var apiCreds = config.get('gekko.pathing');
+  var apiCreds = config.get('gekko.multitrader');
   await rl.initAsync(apiCreds, {verbose});
 //  console.json(rl.e);
 
@@ -42,6 +42,6 @@ Map.prototype.toJSON = function () {
   let printNice = asTable(sortBy(table, Object.values(table), 'value'))
   console.log(printNice)
   */
-  await rl.showBalances();
+//  await rl.showBalances();
   await rl.showDerivedWallet();
 })()
