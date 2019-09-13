@@ -56,7 +56,7 @@ logger.info(filename + " BEGIN ");
     logger.error(e)
   };
   try {
-    const r = await rl.moveMoneyAsync('LTC', amount, 'gemini', 'binance')
+    const r = await rl.moveMoneyAsync('LTC', 1.37039, 'gemini', 'yobit')
     logger.info(r)
   } catch(e) {
     logger.error(e)
