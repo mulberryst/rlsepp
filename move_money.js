@@ -9,7 +9,7 @@ const config = require('config')
   , log4js = require('log4js')
   , moment = require('moment')
 ;
-const logger = log4js.getLogger('screen');
+const logger = log4js.getLogger();
 logger.level = 'debug';
 
 var filename = path.basename(__filename);
@@ -30,12 +30,26 @@ Map.prototype.toJSON = function () {
 //let destAddress ="0x0D78B665bEe557D0Cfb1268A0C88EFF80Ea9B77A" //gemini ETH deposit
 let destAddress = "MRXYwi1pv8Xtz65BXLZK5Nrfox4wgozjGA"; //gdax LTC deposit
 //let amount = 0.00040481;
-let amount = 0.2762553;
+let amount = 1.37039
 logger.info(filename + " BEGIN ");
 (async function main() {
   const rl = new RLSEPP();
   var apiCreds = config.get('gekko.multitrader');
   await rl.initAsync(apiCreds, {verbose});
+
+  let b = await rl.fetchBalances(['binance', 'gemini']);
+//  logger.info(util.inspect(b));
+
+  for (let e of b) {
+    let name = e.name
+    let eAPI = e.eAPI
+//    logger.info(util.inspect(eAPI['LTC']))
+    //free, used, total
+    if (typeof eAPI['LTC'] !== 'undefined') 
+      logger.info("pre move, we have : "+eAPI['LTC']['total']+ " LTC in "+name)
+  }
+
+
   try {
     await rl.showBalances()
   } catch(e) {
@@ -43,7 +57,17 @@ logger.info(filename + " BEGIN ");
   };
   try {
     const r = await rl.moveMoneyAsync('LTC', amount, 'gemini', 'binance')
+    logger.info(r)
   } catch(e) {
     logger.error(e)
   };
+
+
+//  while
+
+  //  loop over show balances until the money shows up
+  //  keep track of timings
+  //  calculate fees locally anyway
+  //
+
 })()

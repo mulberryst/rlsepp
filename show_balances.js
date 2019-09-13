@@ -32,7 +32,7 @@ Map.prototype.toJSON = function () {
 
 (async function main() {
   const rl = new RLSEPP();
-  var apiCreds = config.get('gekko.pathing');
+  var apiCreds = config.get('gekko.multitrader');
   await rl.initAsync(apiCreds, {verbose});
 //  console.json(rl.e);
 
