@@ -100,7 +100,6 @@ const sortBy = (array, key, descending = false) => {
       }
     }
 
-
     let wallet = rl.basis.clone()
     let ledgerTree =  new TreeModel()
     let ledgerRoot = ledgerTree.parse({id:'1', wallet: wallet})

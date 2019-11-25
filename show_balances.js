@@ -42,6 +42,6 @@ Map.prototype.toJSON = function () {
   let printNice = asTable(sortBy(table, Object.values(table), 'value'))
   console.log(printNice)
   */
-//  await rl.showBalances();
+  await rl.showBalances();
   await rl.showDerivedWallet();
 })()
