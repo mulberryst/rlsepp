@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "ccxt": "ccxt/ccxt#master",
-    "gekko": "github:NathanielLLally/gekko#multipipeline_PGAdapter"
-  }
-}
