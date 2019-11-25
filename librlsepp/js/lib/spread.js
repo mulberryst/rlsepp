@@ -83,30 +83,33 @@ class Ticker extends IxDictionary {
   flatten() {
     let data = {}
     for (let row of this) {
-      for (let key of ['price', 'distance', 'mvc']) {
+      for (let key of ['price', 'bid', 'ask', 'distance', 'mvc']) {
         data[row.exchange+ '_' + key] = row[key]
       }
     }
     return data
   }
 
-  asArraySorted() {
+  asArraySorted(field='price') {
     let result = []
+      let tprop = ['price', 'bid', 'ask', 'distance', 'mvc', 'exchange']
     for (let row of this) {
       let nested = {}
-      for (let key of ['price', 'distance', 'mvc', 'exchange']) {
+      for (let key of tprop) {
         nested[key] = row[key]
       }
       result.push(nested)
     }
-    return sortBy(result, 'price', false)
+    if (tprop.indexOf(field) == -1)
+      field = 'price'
+    return sortBy(result, field, false)
   }
 
   strip() {
     let data = {}
     for (let row of this) {
       let nested = {}
-      for (let key of ['price', 'distance', 'mvc']) {
+      for (let key of ['price', 'bid','ask','distance', 'mvc']) {
         nested[key] = row[key]
       }
       data[row.exchange] = nested
@@ -120,15 +123,23 @@ class Ticker extends IxDictionary {
   }
 }
 
-
+//  collection class centered around a commodity which holds
+//    calculations on the entire spread of prices accross all 
+//    ccxt accessible exchanges.
+//
+//  in:  output from fetchArbitrableTickers
+//  out:  object
+//
 //  TODO assertion on class instance types for collections
+//  (to be inline with Tickers' constructor)
 //
 class Spread {
   constructor(initial = null, merge = null) {
     this.ledger = []
     this.commodity = null
     this.symbol = null
-    this.mean = 0
+    this.meanBid = 0
+    this.meanAsk = 0
   
     if (initial instanceof Ticker) {
       this.tickers = initial
@@ -145,8 +156,8 @@ class Spread {
     if (merge instanceof Spread) {
       for (let [k, v] of merge.tickers.entries()) {
         if (this.tickers.has(k)) {
-          console.log(this.tickers[k])
-          console.log(v)
+//          console.log(this.tickers[k])
+//          console.log(v)
           throw new Error("duplicate exchange ticker for symbol: "+v.symbol)
         }
         this.tickers.set(k, v)
@@ -171,39 +182,74 @@ class Spread {
     }
   }
 
-  getPrices() {
+  getPrices(type='bid') {
     let prices = []
     for (let t of this.tickers) {
 //      console.log('getPrices ' + util.inspect(t))
-      prices.push(t.price)
+      if (type == 'bid') {
+        prices.push(t.bid)
+      } else if (type == 'ask') {
+        prices.push(t.ask)
+      } else if (type == 'last') {
+        prices.push(t.price)
+      }
     }
     return prices.sort()
   }
 
+  //  calculate stats
+  //  sort bid price, ask price 
+  //    *! (reminder for the people without an MBA in finance)
+  //      we buy on the ask price (seller is *asking* x)
+  //      we sell on the bid price (buyer has put in a *bid* of y)
+  //
   calculate() {
-    let pA = this.getPrices()
-    this.mean = stats.mean(pA)
-    this.median = stats.median(pA)
-    this.mode = stats.mode(pA)
-    this.variance = stats.variance(pA)
-    this.stdev = stats.stdev(pA)
-    this.min = pA.shift()
-    this.max = pA.pop()
+    let pBid = this.getPrices('bid')
+    let pAsk = this.getPrices('ask')
+    let pLast = this.getPrices('last')
+
+    this.meanBid = stats.mean(pBid)
+    this.medianBid = stats.median(pBid)
+    this.modeBid = stats.mode(pBid)
+    this.varianceBid = stats.variance(pBid)
+    this.stdevBid = stats.stdev(pBid)
+    this.meanAsk = stats.mean(pAsk)
+    this.medianAsk = stats.median(pAsk)
+    this.modeAsk = stats.mode(pAsk)
+    this.varianceAsk = stats.variance(pAsk)
+    this.stdevAsk = stats.stdev(pAsk)
+    this.min = pAsk.shift()
+    this.min2 = pAsk.shift()
+    this.max = pBid.pop()
+    this.max2 = pBid.pop()
+
+    //TODO: makes sense now?
     for (let t of this.tickers) {
-      t.distance = this.mean - t.price
-      t.mvc = t.distance / this.mean
+      t.distanceBid = this.meanBid - t.bid
+      t.mvc = t.distanceBid / this.meanBid
     }
-    let tickers = this.tickers.asArraySorted()
-    this.count = tickers.length
+    let tickersBid = this.tickers.asArraySorted('bid')
+    let tickersAsk = this.tickers.asArraySorted('ask')
+    this.count = tickersBid.length
     if (this.count > 1) {
-      let min = tickers.shift()
-      let max = tickers.pop()
-      if (min !== 'undefined' && max !== 'undefined') {
-        this.range = max.price - min.price
-        this.min = min.price
-        this.max = max.price
+      let min = tickersAsk.shift()
+      let max = tickersBid.pop()
+      let min2 = tickersAsk.shift()
+      let max2 = tickersBid.pop()
+      if (typeof min !== 'undefined' && typeof max !== 'undefined') {
+        this.range = max.ask - min.bid
+        this.min = min.ask
+        this.max = max.bid
         this.minExchange = min.exchange
         this.maxExchange = max.exchange
+      }
+      if (typeof min2 !== 'undefined') {
+        this.min2 = min2.ask
+        this.min2Exchange = min2.exchange
+      }
+      if (typeof max2 !== 'undefined') {
+        this.max2 = max2.bid
+        this.max2Exchange = max2.exchange
       }
     }
   }
@@ -211,11 +257,13 @@ class Spread {
   flatten() {
     let data = this.tickers.flatten()
     data.symbol = this.commodity.symbol
-    data.mean =  this.mean
+    data.meanBid =  this.meanBid
+    data.meanAsk =  this.meanAsk
     return data
   }
 
-  strip(blackList=['median', 'mode', 'stdev','variance', 'tickers']) {
+  strip(blackList=['medianBid', 'medianAsk', 'modeBid', 'modeAsk',
+    'stdevBid','stddevAsk', 'varianceBid', 'varianceAsk', 'tickers']) {
     let data = {}
     let tickers = this.tickers.asArraySorted()
     for (let prop in this) {

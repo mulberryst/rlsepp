@@ -1,8 +1,11 @@
 'use strict';
 const chai = require('chai')
   , log4js = require('log4js')
+  , fs = require("mz/fs")
+  , path = require('path')
   , config = require('config')
   , ccxt = require('./ccxt')
+, { ExchangeError, ArgumentsRequired, BadRequest, OrderNotFound, InvalidOrder, InvalidNonce, DDoSProtection, InsufficientFunds, AuthenticationError, ExchangeNotAvailable, PermissionDenied, NotSupported } = require ('./ccxt/js/base/errors')
   , filterA = require('awaity/filter').default
   , _ = require('lodash')
   , ansicolor = require ('ansicolor').nice
@@ -15,6 +18,9 @@ const chai = require('chai')
   , Ticker = require('./spread').Ticker
   , Spread = require('./spread').Spread
   , Spreads = require('./spread').Spreads
+  , Iterable = require('./iterator').Iterable
+  , nodemailer = require('nodemailer')
+  , JSON = require('JSON')
 ;
 
 const {
@@ -33,14 +39,7 @@ const {
 const { create, all } = require('mathjs')
   // Available options: 'number' (default), 'BigNumber', or 'Fraction'
 const math = create(all)
-
-log4js.configure({
-  appenders: { file: { type: 'file', filename: __filename+'.log' },
-    screen: { type: 'console' },
-  },
-  categories: { default: { appenders: ['screen', 'file'], level: 'info' } }
-});
-
+//const logdir = process.env.LOGDIR || '/tmp/'
 //asTable.configure ({ print: obj => (typeof obj === 'boolean') ? (obj ? 'yes' : 'no') : String (obj) }) (data)
 
 const logger = log4js.getLogger('dual');
@@ -77,6 +76,13 @@ class Exchange  {
   init(args) {
     for (let prop in args) {
       this[prop] = args[prop]
+    }
+  }
+  isActive() {
+    let active = false
+    for (let market of Object.values(this.marketData)) {
+      if (market.active == true)
+        return true
     }
   }
 }
@@ -142,6 +148,10 @@ class  Rlsepp {
     this.basis = new IxDictionary({'USD': this.basisUSD})
     this.basisHigh = new IxDictionary({'USD': this.basisUSD})
   }
+
+  // input: wallet, spreads, 
+  //
+  //
   projectMoves(basis, spreads, direction) {
     let wallet = basis.clone()
     for (let s of spreads) {
@@ -149,6 +159,102 @@ class  Rlsepp {
     }
     return spreads
   }
+
+  interpolate(wallet, time) {
+  }
+
+  //  TODO: refactor with bid/ask
+  //    implement actual movement fees
+  //    *could attempt to implement a time expectation
+  //
+  //
+  //  given a wallet and two exchanges,
+  //    determine the way to move wallet's contents
+  //    resulting in either a profit or the smallest loss
+  //
+//[ { symbol: 'ABT/BTC', price: 0.0000162, exchange: 'okex' },
+//  { symbol: 'ABT/BTC', price: 0.00001796, exchange: 'bittrex' },
+//    
+  //
+  transferAction(wallet, fromExchange, toExchange, arbitrableTickers) {
+    let fromEx = this.dictExchange[fromExchange]
+    let toEx = this.dictExchange[toExchange]
+    assert.isNotNull(fromEx, "no exchange ["+fromExchange+"]")
+    assert.isNotNull(toEx, "no exchange ["+toExchange+"]")
+
+    let move = []
+    let from = new IxDictionary()
+    let to = new IxDictionary()
+
+    console.log(config.get('addresses'))
+
+    //  can move?
+    //
+    for (let spe of arbitrableTickers.values()) {
+      let [base, quote] = spe.symbol.split('/')
+      console.log(base + '/' + quote)
+      //
+      if (spe.exchange == fromExchange) {
+        if (wallet.has(base) && wallet[base].value > 0) {
+          let scope = {cost: wallet[base].value, price: spe.price}
+          from[base] = scope;
+        }
+      }
+      if (spe.exchange == toExchange) {
+        //  we have a deposit address at toExchange for currency res idingin wallet
+        if (wallet.has(quote) && wallet[quote].value > 0 &&
+          config.has('addresses.'+toExchange+'.deposit.'+quote)) {
+          move.push( {action:'move', from_exchange: fromExchange, to_exchange: toExchange, symbol: quote, amount: wallet[base].value, amountType: base, fee: 12.3456789} )
+        }
+      }
+    }
+
+    //fill in to[base]
+    for (let spe of arbitrableTickers.values()) {
+      if (spe.exchange == toExchange) {
+        let [base, quote] = spe.symbol.split('/')
+        //  we have a deposit address at toExchange for currency
+        if ((wallet.has(quote) && wallet[quote].value > 0) &&
+          config.has('addresses.'+toExchange+'.deposit.'+base)) {
+          to[base] = {price: spe.ask}
+          let fee = fromEx.ccxt.calculateFee(spe.symbol, 'type', 'buy', from[base].amount, from[base].price, 'maker', {}).cost || 0
+
+          let scope = from[base]
+          from[base].cost -= fee
+          from[base].amount = math.evaluate('amount =  cost / price', scope)
+
+          move.push( {action:'buy', exchange: fromExchange, amount: from[base].amount, symbol: base, amountType: base, fee: fee, bid:spe.bid, ask:spe.ask, price: spe.ask} )
+
+//          wallet[quote].value = 0
+          wallet[base] = {symbol:base, value: from[base].amount }
+
+//          move.push( {action:'move', from_exchange: fromExchange, to_exchange: toExchange, symbol: base, amount: wallet[base].value, amountType: base, fee: 12.3456789} )
+
+          /*
+          fee = toEx.ccxt.calculateFee(spe.symbol, 'type', 'sell', wallet[base].value, to[base].price, 'maker', {}).cost || 0
+          to[base].cost = wallet[quote].value - fee
+          to[base].amount = math.evaluate('amount = cost / price', to[base])
+
+          move.push( {action:'sell', exchange: toExchange, symbol: base, amount: to[base].amount, amountType: base, fee: fee, costType: quote, price: to[base].price} )
+          */
+        }
+        if (wallet.has(base) && wallet[base].value > 0 &&
+          config.has('addresses.'+toExchange+'.deposit.'+base)) {
+
+          move.push( {action:'move', from_exchange: fromExchange, to_exchange: toExchange, symbol: base, amount: wallet[base].value, amountType: base, USD: wallet[base].value * spe.price} )
+
+        }
+      }
+    }
+
+    //return move.sort ((a,b) => ((a.USD < b.USD) ? -1 : (a.USD > b.USD) ? 1 : 0)).splice(0,2)
+    return move
+  }
+
+  //  given a wallet and a spread,
+  //    enumerate all possible buys and sells from commodity in wallet 
+  //    to respective min & max exchange based on last ticker quote
+  //
   projectMove(wallet, r, direction) {
 
 //    console.log(this.dictExchange
@@ -173,8 +279,8 @@ class  Rlsepp {
 
         //some mathjs issue with scope.amount precision?
         //
-        //math.evaluate('cost = amount * max', scope)
-        scope.cost = scope.amount * scope.max
+        math.evaluate('cost = amount * max', scope)
+        //scope.cost = scope.amount * scope.max
         try {
           scope.fee = maxEx.ccxt.calculateFee(r.symbol, 'type', 'sell', scope.amount, r.max, 'maker', {}).cost
         } catch(e) {
@@ -186,7 +292,7 @@ class  Rlsepp {
 
         r.commodity.value = 0
 
-        r.ledger.push( {action:'sell', exchange: r.maxExchange, symbol: base, amount: scope.amount, amountType: base, cost: scope.cost, fee: scope.fee, costType: quote, price: scope.max} )
+        r.ledger.push( {action:'sell', exchange: r.maxExchange, symbol: base, amount: scope.amount, amountType: base, cost: scope.cost, fee: scope.fee, costType: quote, price: scope.max, priceType: 'bid'} )
 
         scope.amount = 0
       }
@@ -195,6 +301,7 @@ class  Rlsepp {
       //if (direction != 'sell' && ( r.ledger.length == 0 ||  r.ledger[r.ledger.length - 1].action != 'buy' )) {
         scope.cost = wallet[quote].value
         math.evaluate('amount = cost / min', scope)
+        //scope.amount  = scope.cost / scope.min
         scope.fee = 0
         try {
           //could move minEx to next one up until a fee is calculatable
@@ -207,7 +314,7 @@ class  Rlsepp {
           scope.amountType = base
           r.commodity.value = scope.amount
 
-          r.ledger.push( {action:'buy', exchange: r.minExchange, amount: scope.amount, amountType: base, symbol: base, cost: scope.cost, fee: scope.fee, costType: quote, price: scope.min} )
+          r.ledger.push( {action:'buy', exchange: r.minExchange, amount: scope.amount, amountType: base, symbol: base, cost: scope.cost, fee: scope.fee, costType: quote, price: scope.min, priceType: 'ask'} )
         } catch(e) {
           console.log(r.minExchange +" has no market for "+r.symbol, e)
         }
@@ -235,6 +342,9 @@ class  Rlsepp {
     return _singleton;
   }
   /*
+   *  TODO: implement retry
+   *
+   *
   const pairs = await Promise.all(files.map(async (file) => {
     const stats = await fs.stat(file);
     return [stats.isDirectory(), file, stats.size];
@@ -250,44 +360,73 @@ class  Rlsepp {
   */ 
   async initAsync(exchanges, opts = {}) {
     //this.exchanges = new Dictionary();
-    await Promise.all(Object.keys(exchanges).map( async (name) => {
-      let creds = exchanges[name];
-      logger.debug("initializing ccxt exchange ",name);
-      try {
-        let E = new Exchange();
-        let e = await Rlsepp.initExchangeAsync( name, {...opts, ...creds} );
 
-          //TODO
-        //retry / proxy logic from arbitrage-pairs
-        let m = await e.loadMarkets();
-        e['name'] = name;
-        let commodities = new IxDictionary();
-        let count = 0;
-        Object.values(m).forEach ( (market) => {
-          count++;
-          if (typeof market.precision === 'undefined') {
-            logger.debug('warning, exchange '+name+' missing precision info for '+market.symbol+' using {amount: 8, price: 3}')
-            market.precision = {amount:8, price:3}
-          } 
+    let list = [...exchanges]
+    //ccxt.timeout
+    let timeoutInc = 2500
+//    throw new ccxt.RequestTimeout; 
+    let retry  = {}
+    for (let n of list) {
+      retry[n] = opts.retry || 1;
+    }
 
-          commodities.set(market.base, new Commodity({symbol: market.base, api: 'ccxt', type: 'crypto', apitype: 'base'}));
+    let apiAuth = config.get("credentials")
+//    for (let n of retry) {
+      await Promise.all(list.map( async (name) => {
+        let creds = apiAuth[name];
+        logger.debug("initializing ccxt exchange ",name);
+        try {
+          let E = new Exchange();
+          let e = await Rlsepp.initExchangeAsync( name, {...opts, ...creds} );
 
-          //we dont need multiple currencies just for type such as BTC is typically listed as both
-          //
-          if (!commodities.has(market.quote))
-            commodities.set(market.quote,new Commodity({symbol: market.quote, api: 'ccxt',type: 'fiat', apitype: 'quote'}));
-        })
-        logger.info('initialized exchange '+name+' with '+count+" markets");
-        
-        E.init({ 'name': name, 'ccxt': e, 'marketData': m, 'commodities': commodities});
-        this.dictExchange.set(name, E)
+          let m = []
+          let commodities = null
+//          if (Object.hasOwnProperty("load_markets")) {
+            //TODO
+            //retry / proxy logic from arbitrage-pairs
+            m = await e.loadMarkets();
+            e['name'] = name;
+            commodities = new IxDictionary();
+            let count = 0;
+            Object.values(m).forEach ( (market) => {
+              count++;
+              if (typeof market.precision === 'undefined') {
+                logger.debug('warning, exchange '+name+' missing precision info for '+market.symbol+' using {amount: 8, price: 3}')
+                market.precision = {amount:8, price:3}
+              } 
 
-      } catch(e) {
-        e.message = "initAsync: "+e.message;
-        logger.error(e)
-        //throw(new Error(e));
-      };
-    }))
+              commodities.set(market.base, new Commodity({symbol: market.base, api: 'ccxt', type: 'crypto', apitype: 'base'}));
+
+              //we dont need multiple currencies just for type such as BTC is typically listed as both
+              //
+              if (!commodities.has(market.quote))
+                commodities.set(market.quote,new Commodity({symbol: market.quote, api: 'ccxt',type: 'fiat', apitype: 'quote'}));
+            })
+            logger.info('initialized exchange '+name+' with '+count+" markets");
+//          }
+          E.init({ 'name': name, 'ccxt': e, 'marketData': m, 'commodities': commodities});
+          this.dictExchange.set(name, E)
+          if (E.isActive()) {
+            this.dictExchange.set(name, E)
+          } else {
+            logger.warn('exchange '+name+' currently Inactive!')
+          }
+          list.splice(list.indexOf(name), 1)
+
+        } catch(e) {
+          if (e instanceof ccxt.RequestTimeout) {
+            retry[name]--
+            e.message = "initAsync: "+e.message;
+            logger.error(e)
+
+          } else {
+            e.message = "initAsync: "+e.message;
+            logger.error(e)
+          }
+          //throw(new Error(e));
+        };
+      }
+    ))
   }
   //  initExchangeAsync: ccxt only at this time
   //
@@ -316,13 +455,139 @@ class  Rlsepp {
         resolve(eAPI);
       } else {
         let e = new Error('CCXT does not support exchange [' + exName + "]\n" + 
-          printSupportedExchanges());
+          "CCXT Supports "+ccxt.exchanges.join(",")
+        );
         reject(e);
       }
     })
   }
+
+  //  send notification via text or email to user specified in conf
+  //  with said user's credentials
+  //
+  async notify(body, subject = "") {
+    /*
+    //one line on my phone is N chars:
+    //  "Sent from your Twilio trial account"
+    client.messages.create({
+      "body": body,
+      "from": "+16194314849",
+      "to": "+16464507917"
+    }).then(message => logger.info(message.sid + " text message sent"))
+    .catch(err => logger.info(err));
+    */
+
+    // Create a SMTP transporter object
+    let transporter = nodemailer.createTransport(
+        {
+            host: 'smtp.gmail.com',
+            port: 465,
+            secure: 'true',
+            auth: {
+                user: config.get('gmail.user'),
+                pass: config.get('gmail.pass')
+            },
+            logger: true,
+            debug: false // include SMTP traffic in the logs
+        }
+    );
+    // Message object
+    let message = {
+        // Comma separated list of recipients
+        to: config.get('gmail.user'),
+        // Subject of the message
+        subject: '✔ RLSEPP ' + subject + " " + moment().format('dddd h:mma, L'),
+        text: body
+    };
+    transporter.sendMail(message, (error, info) => {
+        if (error) {
+            logger.error('Error occurred');
+            logger.error(error.message);
+            return process.exit(1);
+        }
+
+        logger.info('Message sent successfully!, '+subject);
+//        console.log(nodemailer.getTestMessageUrl(info));
+
+        // only needed when using pooled connections
+        transporter.close();
+    });
+
+  }
+
+  /* TODO: correct fees
+   *
+   * in: currency, exname1, exName2, table of tickers from fetchArbitrableTickers, optional amount
+   *
+   * first, test a micro transaction (below nominal amount)
+   *    ensure the exchange will error on amount
+   *  second, test micro transaction of purchase fee amount
+   *    ensure the exchange errors out
+   *  third, attempt withdraw
+   *    wait for tx to settle, show balance on deposit side
+   *    calculate fee and record
+   */
+
+  async safeMoveMoneyAsync(currency, withdrawExchange, depositExchange, tickers, amount = null) {
+    assert.isNotNull(this.dictExchange[withdrawExchange], "no exchange withdrawExchange")
+    assert.isNotNull(this.dictExchange[depositExchange], "no exchange depositExchange")
+
+    let price = 0
+    let ticker = null;
+    for (let spe of tickers.values()) {
+      let [base, quote] = spe.symbol.split('/')
+      if (spe.exchange == depositExchange && currency == base) {
+        ticker = spe
+      }
+    }
+
+    if (ticker == null) { 
+      return
+    }
+
+    let wEx = this.dictExchange[withdrawExchange]
+    let dEx = this.dictExchange[depositExchange]
+
+    let fee = null
+    try {
+      fee = wEx.ccxt.calculateFee(ticker.symbol, 'type', 'buy', amount, ticker.price, 'maker', {}).cost || 0
+    } catch(e) {
+      return
+    }
+
+    try { 
+      await this.moveMoneyAsync(currency, withdrawExchange, depositExchange, fee/2)
+      logger.info("maker fee for "+amount+ ": "+ticker.symbol+ " : "+withdrawExchange+ ":"+fee)
+    } catch(e) {
+      if (e instanceof ExchangeError) {
+        //  constructor hack for markets from 3rd party API
+        //
+        let message = new ExchangeError(e)
+        //let configObject = { exchange: withdrawExchange, ExchangeError: { InsufficientFunds: wEx.ccxt.last_http_response } } 
+        let configObject = { exchange: withdrawExchange, ExchangeError: { InsufficientFunds: message } } 
+        console.log(util.inspect(configObject,false, null, true))
+      }
+    };
+
+    try {
+      fee = dEx.ccxt.calculateFee(ticker.symbol, 'type', 'buy', amount, ticker.price, 'maker', {}).cost || 0
+    } catch(e) {
+      return
+    }
+    try {
+      await this.moveMoneyAsync(currency, depositExchange, withdrawExchange, fee/2)
+      logger.info("maker fee for "+amount+ ": "+ticker.symbol+ " : "+depositExchange+ ":"+fee)
+    } catch(e) {
+      if (e instanceof ExchangeError) {
+        let message = new ExchangeError(e)
+        let configObject = { exchange: depositExchange, ExchangeError: { InsufficientFunds: message } }
+        console.log(util.inspect(configObject,false, null, true))
+      }
+    }
+  }
+
   /*
-   *  TODO:  support ephemeral addresses
+   *  TODO:  test support of ephemeral addresses [yobit]
    *     update config file for old or missing addresses dynamically
    *
    *  async withdraw (code, amount, address, tag = undefined, params = {})
@@ -330,36 +595,60 @@ class  Rlsepp {
    *    } else if ('coinbase_account_id' in params) {
    *          method += 'CoinbaseAccount';
    */
-  async moveMoneyAsync(symbol, amount, withdrawExchange, depositExchange) {
+  async moveMoneyAsync(currency, withdrawExchange, depositExchange, amount) {
     assert.isNotNull(this.dictExchange[withdrawExchange], "no exhcnage withdrawExchange")
     assert.isNotNull(this.dictExchange[depositExchange], "no exchange depositExchange")
 
     let destAddr = null
 
-    let configKey = 'addresses.'+depositExchange+".deposit."+symbol
+    let configObject = { addresses: { } }
+    try {
+      const contents = await fs.readFile('.addresses.json')
+      configObject = JSON.parse(contents)
+    } catch(e) {
+      console.log(e.message)
+    };
+    if (!Object(configObject.addresses).hasOwnProperty(depositExchange))
+      configObject.addresses[depositExchange] = {}
+    if (!Object(configObject.addresses[depositExchange]).hasOwnProperty('deposit'))
+      configObject.addresses[depositExchange].deposit = {}
+
+    let configKey = 'addresses.'+depositExchange+".deposit."+currency
     if (config.has(configKey))
       destAddr = config.get(configKey)
     else {
       logger.info("no deposit address for exchange "+depositExchange+", fetching...")
-      var data = await this.fetch_create_deposit_address(this.dictExchange[depositExchange],symbol)
-      destAddr = data.address
+      try {
+        var data = await this.fetch_create_deposit_address(this.dictExchange[depositExchange],currency)
+        destAddr = data.address
+
+        configObject.addresses[depositExchange].deposit[currency] = destAddr
+        var cacheFile = fs.createWriteStream('.addresses.json', { flags: 'w' });
+        cacheFile.write( JSON.stringify(configObject, null, 4) )
+
+        console.log(util.inspect(configObject,false, null, true))
+      } catch(e) {
+        logger.error("fetch_create failed for "+depositExchange+ " " + e)
+        return
+      }
     }
 
-    logger.info(symbol+" "+withdrawExchange+"-->"+depositExchange+" :["+destAddr+"]")
+    logger.info(currency+":"+amount+":"+withdrawExchange+":"+depositExchange+":"+destAddr)
 
-    this.dictExchange[withdrawExchange].ccxt.withdraw(symbol, amount, destAddr)
-      .then( response => {
-        logger.info(response)
-      })
-      .catch( e => {
-        logger.error(e)
-        //throw(e); 
-      })
+    let wEx = this.dictExchange[withdrawExchange]
+
+    try {
+      let r = await wEx.ccxt.withdraw(currency, amount, destAddr)
+    } catch(e) {
+      throw(e); 
+    };
+    logger.info(r)
   }
 
+  // array of symbols
   //  derived USD value as 'fiat USD' based on ticker.last
   //
-  async apiFetchTicker(exchange,array) {
+  async apiFetchTicker(exchange,array, whitelist=['datetime', 'high', 'low', 'bid', 'ask', 'close', 'last', 'baseVolume', 'quoteVolume' ,'vwap']) {
     var symbolForPrice = {}
     let table = []
     //    let table = Object.assign({}, portfolio[id])
@@ -367,32 +656,24 @@ class  Rlsepp {
     var i = 0
 
     await asyncForEach(array, async (el, i, a) => {
-      //        let coin = table[id][i]
+      //        let coin = table[id][i]\
 
       try {
         var t = await exchange.ccxt.fetchTicker (el.symbol)
 
-        if (Object.hasOwnProperty('high'))
-          el.high = t.high
-        if (Object.hasOwnProperty('low'))
-          el.low = t.low
-        if (Object.hasOwnProperty('bid'))
-          el.bid = t.bid
-        if (Object.hasOwnProperty('ask'))
-          el.ask = t.ask
-        if (Object.hasOwnProperty('baseVolume'))
-          el.baseVolume = t.baseVolume
-        if (Object.hasOwnProperty('quoteVolume'))
-          el.quoteVolume = t.quoteVolume
-        if (Object.hasOwnProperty('datetime'))
-          el.datetime = t.datetime
-
+//        for (let prop of ['high', 'low', 'bid', 'ask', 'baseVolume', 'quoteVolume', 'datetime', 'close', 'last') {
+        let blacklist = ['info'] //for program performance
+        for (let prop in t) {
+          if (blacklist.indexOf(prop) == -1 && typeof t[prop] !== 'undefined' && whitelist.indexOf(prop) != -1) {
+            el[prop] = t[prop]
+          }
+        }
         el.price = t.last
 
         let cur = el.symbol.split('/')
         //        console.log("currency "+cur[0].red+" against "+cur[1].red);
         symbolForPrice[cur[0]] = el.price
-        el['fiat USD'] = el.amount * t.last
+        el['fiat USD'] = el.amount * t.bid
         if (cur[1] == 'USD' || cur[1] == 'USDT') {
           //          el.value += ' USD'
         } else {
@@ -404,6 +685,7 @@ class  Rlsepp {
         if (el.price > 0) {
         //  table[i++] = el
           table.push(el)
+//          console.log(util.inspect(el, false, false))
         }
       } catch(e) {
       };
@@ -411,6 +693,9 @@ class  Rlsepp {
     return table
   }
 
+  // in: table of tickers as output by fetchArbitrableTickers
+  //
+  //
   deriveSpreads(table) {
     assert.isNotNull(table, "deriveMinMaxSpreads passed nothing, requires ticker snapshot" )
 
@@ -430,16 +715,64 @@ class  Rlsepp {
     for (let spread of spreads) {
       spread.calculate()
     }
+
     return spreads
   }
 
-  //  in: ixDict of symbols by exchange, base currency
-  //  out: array of objects
+  //  TODO timestamps > (insert age)
   //
-  async fetchArbitrableTickers(exchangeForSymbol = null, baseWhiteList = ['BTC', 'USD']) {
+  //  apply heuristics to cache of tickers 
+  //  input: collection:cache, collection:exchanges
+  //  returns
+  //
+  checkTickerCache(cache=[])
+  {
+    let tcount = new IxDictionary
+    let k = this.dictExchange.keys()
+    for (let t of cache) {
+      tcount.set(t.exchange,tcount.get(t.exchange)+1)
+    }
+    for (let e of k) {
+      if (!tcount.has(e)) {
+        console.error('ticker cache missing exchange '+e)
+        return false
+      }
+    }
+    return true
+  }
+
+  //  in: ixDict of symbols by exchange
+  //      list of base currencies for spread calculations to quote against
+  //     {
+  //      "exchange name": ["BTC", "LTC", "ETH", "BCH", "ZEC", "XEM", "XRP", "DOGE"]
+  //     },
+  //     ['USD']
+  //
+  //  out: array of ticker objects
+  //
+  async fetchArbitrableTickers(exchangeForSymbol = null, baseWhiteList = ['USD']) {
     if (exchangeForSymbol == null) {
       exchangeForSymbol = this.arbitrableCommodities()
     }
+
+
+    /*
+     *  use file cache if possible
+     *  could also reference the white list on check cache
+     */
+    let table = []
+    try {
+      const contents = await fs.readFile('.tickers.json')
+      table = JSON.parse(contents)
+    } catch(e) {
+      console.log(e.message)
+    };
+
+    if (this.checkTickerCache(table,this.dictExchanges)) {
+      return table
+    }
+
+
     let promises = []
 
     //  take each base commodity, check against fetchTicker capability of each exchange
@@ -478,7 +811,7 @@ class  Rlsepp {
 
     logger.info("looking up "+exchangeForSymbol.size()+" symbols across "+exchangeTickers.size()+" exchanges")
     try {
-      const results = await filterA(promises, async (tuple) => {
+      let results = await filterA(promises, async (tuple) => {
         const el = await tuple;
         return el;
       });
@@ -490,16 +823,23 @@ class  Rlsepp {
           r.push(inner)
         }
       }
-      return r.sort ((a,b) => ((a.symbol < b.symbol) ? -1 : (a.symbol > b.symbol) ? 1 : 0))
+      table = r.sort ((a,b) => ((a.symbol < b.symbol) ? -1 : (a.symbol > b.symbol) ? 1 : 0))
+
+      var tickerFile = fs.createWriteStream('.tickers.json', { flags: 'w' });
+      tickerFile.write( JSON.stringify(table, null, 4) )
+
+      return table
     } catch(e) {
       console.log(e)
     }
   }
 
-  // in: nada
+  // in: blacklist of symbols (many exchanges may list symbols as base currency simply for 
+  //     a statisticians appreciation - bitmex i think might have been one
+  //    (USDT, USD, Fiat)
   // out: IxDictionary map of symbols per exchange (unique)
   //
-  arbitrableCommodities() {
+  arbitrableCommodities(blacklist = []) {
 		// get all unique symbols
 		let symbolHist = new IxDictionary()
 		let exSymbol = new IxDictionary()
@@ -507,7 +847,7 @@ class  Rlsepp {
     for (let [name, Exchange] of this.dictExchange.entries()) {
       assert.isNotNull(Exchange.ccxt, "no exchange "+name)
       for (let c of Exchange.commodities.values()) {
-        if (c.apitype == 'base') {
+        if (c.apitype == 'base' && blacklist.indexOf(c.name) == -1) {
           let prev = 0
           if (symbolHist.has(c.name)) {
             prev = symbolHist[c.name]
@@ -561,8 +901,13 @@ class  Rlsepp {
         let cur = s.split('/')
         let base = cur[0]
 
-        //TODO: for direct way of determining if currency can be bought,sold,and moved 
-        //  ignore quote only currencies on exchanges, they wont be traded
+        //TODO: for direct way of determining if currency can be bought,sold,and moved
+        //
+        //  solved, not yet implemented.
+        //  use gekko's market fetcher for static filers and exchange markets wrappers
+        //    for dynamic list of purchasable commodities 
+        //
+        //  for now, for this- ignore quote only currencies on exchanges, they wont be traded
         //
         if (Exchange.commodities.has(base) && Exchange.commodities[base].apitype == 'base') {
           let prev = 0
@@ -628,10 +973,11 @@ class  Rlsepp {
     return result
   }
 
-  async showDerivedWallet(balances) {
+  async showDerivedWallet(balances = null, whitelist=['datetime', 'high', 'low', 'bid', 'ask', 'close', 'last', 'baseVolume', 'quoteVolume' ,'vwap']) {
     if (balances == null) {
       balances = await this.fetchBalances();
     }
+    let total = {USD:0}
     for (let oResult of balances) {
       let name = oResult.name;
       let eAPI = oResult.eAPI;
@@ -640,51 +986,72 @@ class  Rlsepp {
       let cludge = []
       console.log(name.magenta)
       for (let prop in eAPI) {
-        if (this.dictExchange[name].commodities.has(prop) ) {
-          //check for existence
-          let fiats = ['USD', 'USDT', 'CAD']
-          for (let el of fiats) {
-            if (el == prop && eAPI[prop].total > 0) {
-              let k = 'fiat '+el;
-              let v = {symbol: el, price: 1};
-              v[k] = eAPI[prop].total;
-              cludge.push(v);
-            }
+        //check for existence
+        let fiats = ['USD', 'USDT', 'CAD']
+        for (let el of fiats) {
+          if (el == prop && eAPI[prop].total > 0) {
+            let k = 'fiat '+el;
+            let v = {symbol: el, price: 1};
+            v[k] = eAPI[prop].total;
+            total[el] += eAPI[prop].total;
+            cludge.push(v);
+          }
 
-            let ticker = prop+"/"+el
-//            console.log(Object(this.dictExchange[name].marketData).hasOwnProperty(ticker))
-            if (Object(this.dictExchange[name].marketData).hasOwnProperty(ticker)
-              && eAPI[prop].total > 0)
-              tickers.push({symbol: ticker, amount: eAPI[prop].total})
+          let ticker = prop+"/"+el
+          //            console.log(Object(this.dictExchange[name].marketData).hasOwnProperty(ticker))
+          if (Object(this.dictExchange[name].marketData).hasOwnProperty(ticker)
+            && eAPI[prop].total > 0)
+            tickers.push({symbol: ticker, amount: eAPI[prop].total})
+        }
+      }
+
+      let table = await this.apiFetchTicker(this.dictExchange[name], tickers, whitelist)
+      //, ['datetime', 'bid','ask', 'price'])
+
+      table= table.filter(el => { if (el != null) return el })
+      table = table.concat(cludge)
+
+      //  compute total sums
+      //
+      let formattedTable = [];
+      for (let row of table) {
+        total['USD'] += row['fiat USD']
+      }
+
+      for (let row of table) {
+        let foo = row
+        for (let key of Object.keys(row)) {
+          //keyumn header matches with 'value', thus far it's derived as a curency
+          if (key != 'datetime') {
+            if (key.startsWith('fiat') && foo[key] > 0 ) {
+              foo[key] = numeral(foo[key]).format('$0,0.0')
+              //          /[A-Z]/g;
+            } else if ( String(foo[key]).match('[0-9]') ) {
+              foo[key] = formatCrypto(foo[key])
+            }
           }
         }
+        formattedTable.push(foo)
       }
-    let table = await this.apiFetchTicker(this.dictExchange[name], tickers)
 
-    table= table.filter(el => { if (el != null) return el })
-    table = table.concat(cludge)
-
-    let formattedTable = [];
-    for (let row of table) {
-      let foo = row
-      for (let key of Object.keys(row)) {
-        //keyumn header matches with 'value', thus far it's derived as a curency
-        if (key.startsWith('fiat') && foo[key] > 0 ) {
-          foo[key] = numeral(foo[key]).format('$0,0.0')
-//          /[A-Z]/g;
-        } else if ( String(foo[key]).match('[0-9]') ) {
-          foo[key] = formatCrypto(foo[key])
-        }
-      }
-      formattedTable.push(foo)
+      // TODO, dynamize property
+      //
+      //    let printNice = asTable(sortBy(table, Object.values(table), 'fiat USD'))
+      let printNice = asTable(sortBy(formattedTable, Object.values(formattedTable), 'fiat USD'))
+      console.log(printNice)
     }
 
-    // TODO, dynamize property
+
+    //  also format & print totals
     //
-    let printNice = asTable(sortBy(formattedTable, Object.values(formattedTable), 'fiat USD'))
-//    let printNice = asTable(sortBy(table, Object.values(table), 'fiat USD'))
-    console.log(printNice)
+    console.log(util.inspect(total,true,true))
+
+    console.log('total'.magenta)
+    let tbl = []
+    for (let p in total) {
+      tbl.push({symbol: p, amount: total[p]})
     }
+    console.log(asTable(tbl))
   }
 
   showTickers(table)  {
@@ -712,7 +1079,7 @@ class  Rlsepp {
     console.log(printNice)
   }
   async showBalances() {
-    const balances = await this.fetchBalances();
+    let balances = await this.fetchBalances();
     for (let oResult of balances) {
       let name = oResult.name;
       let eAPI = oResult.eAPI;
@@ -746,6 +1113,7 @@ class  Rlsepp {
       let printNice = asTable(sortBy(table, Object.values(table), 'total'))
       console.log(printNice)
     }
+    return balances
   }
 
   async fetchBalances() {
@@ -779,10 +1147,12 @@ class  Rlsepp {
       promises.push(p);
     }
     try {
-      const results = await filterA(promises, async (tuple) => {
+      let results = await filterA(promises, async (tuple) => {
         const el = await tuple;
-        return el;
+//        if (isObject(el.eApi))
+          return el
       });
+//      results = results.filter( el => isObject(el.eApi) )
       return results;
       /*  [ [ "exchange", {info:  [], "BTC": { free: #, used: #, total: #}
       */
@@ -804,9 +1174,9 @@ class  Rlsepp {
         console.log ('Successfully fetched deposit address for ' + currencyCode)
         return(fetchResult)
       } catch (e) {
-        // never skip proper error handling, whatever it is you're building
+        // never skip proper error handling, whatever it is you're buildingsd   
         // actually, with crypto error handling should be the largest part of your code
-        if (e instanceof exchange.ccxt.InvalidAddress) {
+//        if (e instanceof exchange.ccxt.InvalidAddress) {
           console.log ('The address for ' + currencyCode + ' does not exist yet')
           if (exchange.ccxt.has['createDepositAddress']) {
             console.log ('Attempting to create a deposit address for ' + currencyCode + '...')
@@ -829,10 +1199,12 @@ class  Rlsepp {
           } else {
             throw('The exchange does not support createDepositAddress()')
           }
+          /*
         } else {
           console.log ('There was an error while fetching deposit address for ' + currencyCode, e.constructor.name, e.message)
           throw("unknown error"+e)
         }
+        */
       }
     }
 }
