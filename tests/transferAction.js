@@ -48,9 +48,10 @@ const sortBy = (array, key, descending = false) => {
 
 (async function main() {
   const rl = Rlsepp.getInstance();
-  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
+//  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
 
-  await rl.initAsync(ixExchanges, {verbose});
+//  await rl.initAsync(config.get("exchanges"), {verbose});
+  await rl.initAsync(['yobit', 'cex'], {verbose});
 
   let ixAC = rl.arbitrableCommodities(['USDT'])
   let k = [...ixAC.keys()]
@@ -67,7 +68,7 @@ const sortBy = (array, key, descending = false) => {
     "ZEC": {symbol: "ZEC", value:29.51168300, exchange: "livecoin"},
   })
 
-  let [from,to] = ["livecoin", "yobit"]
+  let [from,to] = ["yobit","cex"]
   try {
 //    for await (let [from, to] of ixExchanges) {
       console.log(from+' '+to)

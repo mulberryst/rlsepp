@@ -19,6 +19,7 @@ async function main() {
   let it = new IxDictionary(data)
 
   it[3] = 'gh'
+  for (let [f,t] of it.Iterable('fromToRoundRobin')) console.log(f+'=>'+t)
   for await (let [f,t] of it.Iterable('fromToRoundRobin')) console.log(f+'=>'+t)
 
   for (let e of it) console.log(e)

@@ -62,14 +62,27 @@ let smallAmount = {
 
 (async function main() {
   const rl = Rlsepp.getInstance();
-  let ixExchanges = new IxDictionary(["yobit", "livecoin"])
-  await rl.initAsync(config.get("exchanges"), {verbose});
-//  console.json(rl.e);
+  let ixExchanges = new IxDictionary(["yobit", "cex"])
+//  await rl.initAsync(config.get("exchanges"), {verbose});
+  await rl.initAsync(ixExchanges, {verbose});
 
-  let ixAC = rl.arbitrableCommodities(['USDT'])
+//  let ixAC = rl.arbitrableCommodities(['USDT'])
+//  console.log(JSON.stringify(ixAC, null ,4))
+//  throw('yey')
 
-  let table = await rl.fetchArbitrableTickers(ixAC, ['BTC'])
-  console.log( asTableLog( table ) )
+//  console.log(JSON.stringify(rl.dictExchange, null, 4))
+//  throw('exit')
+
+  let ixC = new IxDictionary()
+  for (let e of ixExchanges) {
+    for (let c of rl.dictExchange[e].commodities) {
+      ixC.set(c.name, [e, e])
+    }
+  }
+
+  let table = await rl.fetchArbitrableTickers(ixC, ['USD','BTC'])
+//  console.log( asTableLog( table ) )
+
 
   try {
     await rl.showBalances()
@@ -77,6 +90,7 @@ let smallAmount = {
     logger.error(e)
   };
 
+  /*
   let spreads = rl.deriveSpreads( table )
 
 //  const r = await rl.safeMoveMoneyAsync('ZEC', 'gemini', 'livecoin', table, 29.511683)
@@ -89,20 +103,27 @@ let smallAmount = {
       baseForExchange[spread.commodity.symbol].set(exchange,exchange)
     }
   }
-  for (let base in baseForExchange) {
-    //for (let [from,to] in baseForExchange[base].Iterable('fromTo')) {
-   for await (let [from,to] of baseForExchange[base].Iterable('fromToRoundRobin')) {
-//    for (let from of baseForExchange[base]) {
-      console.log(base + ' ' +from+' -> '+to)
-//      let ixSupporting = 
-//make a list of exchanges supporting the currency
-//use iteratorFromTo to validate the withdraw/deposit addresses
+  */
+//  for (let base in baseForExchange) {
+  for (let [from,to] of ixExchanges.Iterable('fromTo')) {
+    for (let c of rl.dictExchange[from].commodities) {
+      //    for (let from of baseForExchange[base]) {
+      console.log(c.name + ' ' +from+' -> '+to)
+      //      let ixSupporting = 
+      //make a list of exchanges supporting the currency
+      //use iteratorFromTo to validate the withdraw/deposit addresses
 
       try {
-        const r = await rl.safeMoveMoneyAsync(base, from, to, table, smallAmount[base])
+        const r = await rl.safeMoveMoneyAsync(c.name, from, to, table, 0.0001)
       } catch(e) {
         logger.error(e)
       };
     }
   }
+//  }
+
+  var cacheFile = fs.createWriteStream('.addresses.json', { flags: 'w' });
+  cacheFile.write( JSON.stringify(rl.addresses, null, 4) )
+
+
 })()
