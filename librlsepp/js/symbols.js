@@ -1,1 +1,0 @@
-node_modules/ccxt/examples/js/symbols.js
