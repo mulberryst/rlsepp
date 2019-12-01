@@ -51,24 +51,28 @@ const sortBy = (array, key, descending = false) => {
 //  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
 
 //  await rl.initAsync(config.get("exchanges"), {verbose});
-  await rl.initAsync(['yobit', 'cex'], {verbose});
+  await rl.initAsync(['yobit', 'gemini'], {verbose});
 
   let ixAC = rl.arbitrableCommodities(['USDT'])
   let k = [...ixAC.keys()]
 
+  /*
   for (let c of k.sort((a,b) => (a < b)?-1:(a>b)?1:0)) {
     console.log(c+' '+ixAC[c])
   }
+  */
 
   let table = await rl.fetchArbitrableTickers(ixAC, ['USD', 'BTC', 'ZEC'])
+  console.log(JSON.stringify(table, null ,4))
 
 //  let wt = rl.basis.clone()
   let w = new IxDictionary( {
     "LSK": {symbol: "LSK", value:1248.43636513, exchange: "yobit"},
     "ZEC": {symbol: "ZEC", value:29.51168300, exchange: "livecoin"},
+    "USD": {symbol: "USD", value:1000, exchange: "yobit"},
   })
 
-  let [from,to] = ["yobit","cex"]
+  let [from,to] = ["yobit","gemini"]
   try {
 //    for await (let [from, to] of ixExchanges) {
       console.log(from+' '+to)

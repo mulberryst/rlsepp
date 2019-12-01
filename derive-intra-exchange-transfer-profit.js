@@ -36,7 +36,7 @@ const cryptoScale = 5
 let symbolForPrice = {}
 
 //i have accounts on these exchanges
-let	exchangeList = [ "gemini", "gdax", "yobit", "quadrigacx", "binance" ]
+let	exchangeList = [ "gemini", "gdax", "coinbase", "yobit", "binance" ]
 let portfolio
 let apiKeys
 

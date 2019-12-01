@@ -1,7 +1,0 @@
-/*
-withdraw.json
-
-take the balance on exchange
-and move it around
-compare starting value to ending value
-*/

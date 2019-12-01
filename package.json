@@ -1,15 +1,25 @@
 {
   "dependencies": {
+    "JSON": "^1.0.0",
     "ansicolor": "^1.1.92",
     "as-table": "^1.0.52",
+    "bignumber.js": "^9.0.0",
+    "ccxt": "^1.18.1122",
     "chai": "^4.2.0",
     "config": "^3.2.2",
     "dictionaryjs": "^1.0.9",
+    "ethereumjs-abi": "^0.6.8",
+    "ethereumjs-util": "^6.1.0",
     "list-to-tree": "^2.2.3",
     "log4js": "^5.1.0",
     "mathjs": "^6.1.0",
     "moment": "^2.24.0",
+    "mz": "^2.7.0",
+    "nodemailer": "^6.3.1",
     "ololog": "^1.1.146",
-    "tree-model": "^1.0.7"
+    "sendmail": "^1.6.1",
+    "tree-model": "^1.0.7",
+    "twilio": "^3.35.1",
+    "web3": "^1.2.1"
   }
 }
