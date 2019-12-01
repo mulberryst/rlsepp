@@ -1,0 +1,24 @@
+{
+  "gekko": {
+    "debug": true,
+    "watch": {
+      "exchange": "gdax",
+      "currency": "USD",
+      "asset": "BTC"
+    },
+    "trader": {
+      "enabled": false,
+      "key": "18f14eb65ad462307651896b22290dad",
+      "secret": "Z7MC/iDHzkZ3wtz8dQyZumYBimlzLD9O7Y4uSOM2cZjRE3xSWydS/TRWz+2WS/08YUo5EhM6eicLiHuHYso7TQ==",
+      "username": "",
+      "passphrase": "suckit"
+    },
+    "multitrader": {
+      "yobit": {
+        "enabled": true,
+        "key": "561D4AF71F1944803C000B49B12E395C",
+        "secret": "84336fd7dc4f61aa045b33d27750abf6"
+      }
+    }
+  }
+}
