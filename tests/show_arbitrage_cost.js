@@ -60,7 +60,14 @@ const sortBy = (array, key, descending = false) => {
 
 (async function main() {
   const rl = Rlsepp.getInstance();
-  await rl.initAsync(config.get("exchanges"), {verbose});
+  let exchanges
+  var myArgs = process.argv.slice(2);
+  if (myArgs.length > 1)
+    exchanges = myArgs
+  else
+    exchanges = config.get('exchanges')
+
+  await rl.initAsync(exchanges, {verbose});
 //  console.json(rl.e);
 
 /*
@@ -76,21 +83,13 @@ const sortBy = (array, key, descending = false) => {
   let ledger = []
 //  for (let base of ['USD', 'BTC', 'LTC', 'ETH', 'ZEC', 'XRP',]) {
     let listAC = rl.arbitrableCommodities(['USDT'])
-    console.log(listAC)
-    let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ZEC'])
+//    console.log(listAC)
+    let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])
 
-  for (let row of table) {
-    console.tickers( util.inspect(row,false,null,true) )
-  }
-
+//  console.log(JSON.stringify(table, null, 4))
 
   let wt = rl.basis.clone()
   let spreads = rl.deriveSpreads( table )
-
-//  for (let spread of spreads) {
-//    console.log(util.inspect(spread,false, null, true))
-    //console.log('%j', spread.strip(['commodity']))
-//  }
 
 //Utilizing an N-ary tree data type for spreads to emulate the functionality of a 
 //  wallet might be the way to go for projections.
@@ -205,7 +204,7 @@ const sortBy = (array, key, descending = false) => {
   }
 
   let endGame = ledgerRoot.all(function (node) {
-    return node.model.wallet['USD'].value > 1000;
+    return node.model.wallet['USD'].value > 900;
   });
 
   //  
@@ -222,7 +221,8 @@ const sortBy = (array, key, descending = false) => {
 
     //  within a periodicity of one hour, a good rule of thumb is 4000
     //
-    if ((node.model.wallet.USD.value >= 1005) && (node.model.wallet.USD.value <= 4000))
+    //if ((node.model.wallet.USD.value >= 955) && (node.model.wallet.USD.value <= 4000))
+    if ((node.model.wallet.USD.value <= 4000))
     {
       var tweet = "";
 //      /* Altcoin/Centralized/4k max */

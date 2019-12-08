@@ -13,7 +13,7 @@ const config = require('config')
 var filename = path.basename(__filename);
 var logStdout = process.stdout;
 var logStderr = process.stderr;
-var logFile = fs.createWriteStream(filename+'.log', { flags: 'w' }); 
+var logFile = fs.createWriteStream("/home/nathaniel/log/"+filename+'.log', { flags: 'w' }); 
 
 console.debug = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
 console.error = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
@@ -33,7 +33,7 @@ Map.prototype.toJSON = function () {
 
 (async function main() {
   const rl = new RLSEPP();
-  await rl.initAsync(["gemini","livecoin","yobit"], {verbose, timeout:12500, retry: 5});
+  await rl.initAsync(["livecoin","yobit"], {verbose, timeout:12500, retry: 5});
 //  console.json(rl.e);
 
 /*
