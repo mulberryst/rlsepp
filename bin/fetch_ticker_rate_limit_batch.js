@@ -74,7 +74,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         ? -1 : (tickers[e][a].datetime > tickers[e][b].datetime) ? 1 : 0))
 
       let batchKeys = tickersOfE.splice(0,nPerE[e])
-      let batch = tickers[e].splice(batchKeys).map(obj => obj.symbol)
+      let batch = tickers[e].splice(batchKeys).values()
 
       //  yobit etc.. need a list for the call argument # limit
       //
@@ -82,7 +82,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         if (batch.length > 0) {
           stats[0]++
           stats[1].push(batch.length)
-          let p = rl.apiFetchTickers(e, batch)
+          let p = rl.apiFetchTickers(e, batchKeys)
           promises.push(p);
         } else {
           tickers.remove(e)
@@ -92,7 +92,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         if (batch.length > 0) {
           stats[0]++
           stats[1].push(batch.length)
-          let p = rl.fetchTickers(e, batch)
+          let p = rl.fetchTickers(e, batchKeys)
           promises.push(p);
         } else {
           tickers.remove(e)
