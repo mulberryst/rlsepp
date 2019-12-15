@@ -1,4 +1,5 @@
 'use strict';
+process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
   , fs = require("mz/fs")
@@ -8,8 +9,8 @@ const config = require('config')
   , JSON = require('JSON')
   , log = require ('ololog')
   , log4js = require('log4js')
-  , Rlsepp = require('./librlsepp').Rlsepp
-  , Tickers = require('./librlsepp/js/lib/spread').Tickers
+  , Rlsepp = require('librlsepp').Rlsepp
+  , Tickers = require('librlsepp/js/lib/spread').Tickers
 ;
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))

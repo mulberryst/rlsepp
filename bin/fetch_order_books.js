@@ -1,4 +1,5 @@
 'use strict';
+process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
   , fs = require("mz/fs")
@@ -7,8 +8,8 @@ const config = require('config')
   , moment = require('moment')
   , JSON = require('JSON')
   , log = require ('ololog')
-  , Rlsepp = require('./librlsepp').Rlsepp
-  , Storable = require('./librlsepp/js/lib/storable').Storable
+  , Rlsepp = require('librlsepp').Rlsepp
+  , Storable = require('librlsepp/js/lib/storable').Storable
 ;
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))

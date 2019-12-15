@@ -1,4 +1,5 @@
 'use strict';
+process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
   , fs = require("mz/fs")
@@ -8,10 +9,10 @@ const config = require('config')
   , JSON = require('JSON')
   , log = require ('ololog')
   , log4js = require('log4js')
-  , Rlsepp = require('./librlsepp').Rlsepp
-  , Tickers = require('./librlsepp/js/lib/spread').Tickers
-  , IxDictionary = require('./librlsepp/js/lib/ixdictionary')
-  , Storable = require('./librlsepp/js/lib/storable').Storable
+  , Rlsepp = require('librlsepp').Rlsepp
+  , Tickers = require('librlsepp/js/lib/spread').Tickers
+  , IxDictionary = require('librlsepp/js/lib/ixdictionary')
+  , Storable = require('librlsepp/js/lib/storable').Storable
 ;
 
 const logger = log4js.getLogger('file');
