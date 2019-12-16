@@ -69,6 +69,12 @@ const sortBy = (array, key, descending = false) => {
   let storable = new Storable({exchanges:['default']})
   await storable.init()
   let tickers = await storable.retrieve(null, 'tickers')
+  for (let e in tickers) {
+    for (let s in tickers[e]) {
+      if (tickers[e][s].age && tickers[e][s].age > 3600)
+        tickers[e].remove(s)
+    }
+  }
   rl.tickersByExchange = tickers
  
   let opt = stdio.getopt({
@@ -252,7 +258,7 @@ const sortBy = (array, key, descending = false) => {
     }
 
   }
-  rl.notify(message.join("\n"), 'synopsis');
+//  rl.notify(message.join("\n"), 'synopsis');
   console.log(message.join("\n"));
 
   eventFile.write(JSON.stringify(transaction, null, 4))

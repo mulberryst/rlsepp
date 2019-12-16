@@ -20,7 +20,6 @@ const config = require('config')
   , log = require('ololog')
 ;
 
-var eventFile= fs.createWriteStream('events.transfer.json', { flags: 'w' }); 
 var filename = path.basename(__filename);
 var logStdout = process.stdout;
 var logStderr = process.stderr;
@@ -68,8 +67,19 @@ function walletValue(wallet) {
   let opt = stdio.getopt({
     'from': {key: 'f', args: 1, mandatory: true, description: "Beginning exchange"},
     'to': {key: 't', args: 1, description: "Ending exchange"},
-    'wallet': {key: 'w', args: 1, description: "Beginning wallet (JSON)"},
+    'file': {key: 'o', args:1, description: "Specifify output file name"},
+    'currency': {key: 'c', args:1},
+    'amount': {key: 'a', args:1}
   });
+
+  let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: opt.from}})
+  if (opt.wallet)
+    wallet = new IxDictionary(JSON.parse(opt.wallet))
+
+  if (opt.currency && opt.amount) {
+    wallet = new IxDictionary()
+    wallet.set(opt.currency, {currency:opt.currency, value: Number(opt.amount), exchange: opt.from})
+  }
 
   let allExchanges = config.get('exchanges')
   await rl.initAsync(allExchanges, {verbose});
@@ -78,7 +88,6 @@ function walletValue(wallet) {
   let k = [...ixAC.keys()]
 
   //let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: from}})
-  let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: opt.from}})
 
   let level = 1
   let treeModel =  new TreeModel()
@@ -87,8 +96,11 @@ function walletValue(wallet) {
 
 
   await rl.retrieve(null, 'tickers')
-  for (let fromTicker of rl.getTickerByExchange(opt.from)) {
-    rl.projectBuyTree(wallet.clone(), opt.from, fromTicker, treeNode)
+  let we = walletValue(wallet)
+  let wq = we.currency
+  for (let symbol of rl.exchangeMarketsHavingQuote(opt.from, wq)) {
+    let ticker = rl.getTickerByExchange(opt.from,symbol)
+    rl.projectBuyTree(wallet.clone(), opt.from, ticker, treeNode)
   }
 
   for (let i = 0; i<=1 ;i++) {
@@ -100,10 +112,12 @@ function walletValue(wallet) {
       if (typeof entry === 'undefined')
         continue
       let quote = entry.currency
+//      log(quote)
 
       for (let name of rl.dictExchange.keys()) {
         for (let symbol of rl.exchangeMarketsHavingQuote(name, quote)) {
           if (typeof rl.getTickerByExchange(name,symbol) !== 'undefined') {
+//            log(symbol)
             if (quote == 'USD' && name != entry.exchange)
               continue
 //            console.log(name + " " + symbol + JSON.stringify(node.model.wallet))
@@ -141,10 +155,12 @@ function walletValue(wallet) {
 
   level *= 100
   let transaction = {}
+
+
   for (let node of treeRoot.all(function (node) { 
-    return  node.model.wallet.has('USD') && node.model.wallet.USD.value > 0 && 
-      (node.model.wallet.USD.value > (wallet.USD.value - (wallet.USD.value * 0.05)))
-      && (node.model.wallet.USD.value < (wallet.USD.value + (wallet.USD.value * 4)))
+    return  node.model.wallet.has('USD') && node.model.wallet.USD.value > 0
+      && (node.model.wallet.USD.value > (wallet.USD.value - (wallet.USD.value * 0.05)))
+      && (node.model.wallet.USD.value < (wallet.USD.value + (wallet.USD.value * 10)))
   }).sort((a,b) => 
     ((a.model.wallet.USD.value < b.model.wallet.USD.value) ? -1 : (a.model.wallet.USD.value > b.model.wallet.USD.value) ? 1 : 0)
   )) {
@@ -173,7 +189,11 @@ function walletValue(wallet) {
 
   }
 
-  console.log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
+  if (wallet.has("USD"))
+    console.log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
+
+  var fileName = opt.file || 'events.transfer.'+opt.from+'.json'
+  var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
   eventFile.write(JSON.stringify(transaction, null, 4))
 
 //  wallets.sort((a,b) => ((a.USD.value < b.USD.value) ? -1 : (a.USD.value > b.USD.value) ? 1 : 0))

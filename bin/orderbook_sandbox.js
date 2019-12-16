@@ -74,9 +74,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let cacheBookTree = new IxDictionary()
   let orderBooks = null
 
-  log(events)
+  //log(events)
   let books = await rl.fetchOrderBooks(events, {store:false})
-  log(books)
+  //log(books)
 
   let transaction = new IxDictionary()
   for (let tid in jsonevents) {
@@ -87,7 +87,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       continue
     try {
       for (let action of jsonevents[tid]) {
-        log(action)
+//        log(action)
         let exchange = action.exchange
         let symbol = action.amountType + "/"+ action.costType
 
