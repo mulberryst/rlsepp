@@ -65,8 +65,8 @@ function walletValue(wallet) {
 //  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
 
   let opt = stdio.getopt({
-    'from': {key: 'f', args: 1, mandatory: true, description: "Beginning exchange"},
-    'to': {key: 't', args: 1, description: "Ending exchange"},
+    'from': {key: 'f', args: 1, mandatory: true, description: "Beginning exchange", multiple: true},
+    'to': {key: 't', args: 1, description: "Ending exchange", multiple: true},
     'file': {key: 'o', args:1, description: "Specifify output file name"},
     'currency': {key: 'c', args:1},
     'amount': {key: 'a', args:1}
@@ -106,7 +106,7 @@ function walletValue(wallet) {
   for (let i = 0; i<=1 ;i++) {
     //          let [base, quote] = symbol.split('/')
     // for each resulting currrency {crypto on from exchange
-    level *= 100
+    level *= 1000
     for (let node of treeRoot.all(function (node) { return node.model.id >= level })) {
       let entry = walletValue(node.model.wallet)
       if (typeof entry === 'undefined')
@@ -135,7 +135,7 @@ function walletValue(wallet) {
     }
   }
 
-  level *= 100
+  level *= 1000
   //  
   for (let node of treeRoot.all(function (node) {
     return node.model.id >= level  
@@ -153,7 +153,7 @@ function walletValue(wallet) {
     }
   }
 
-  level *= 100
+  level *= 1000
   let transaction = {}
 
 

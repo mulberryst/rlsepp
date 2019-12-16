@@ -104,6 +104,25 @@ let smallAmount = {
     }
   }
   */
+
+  /* 
+   * Market data
+ "UNRC/USD": {
+        "limits": {
+            "amount": {
+                "min": 10500,
+                "max": 100000000
+            },
+            "price": {
+                "min": 0.00001,
+                "max": 100000
+            }
+        },
+        "precision": {
+            "price": 5,
+            "amount": 8,
+*/
+
 //  for (let base in baseForExchange) {
   for (let [from,to] of ixExchanges.Iterable('fromTo')) {
     for (let c of rl.dictExchange[from].commodities) {

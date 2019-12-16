@@ -25,25 +25,35 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let exchanges = []
   let opt = stdio.getopt({
-    'file': {key: 'f', args: 1, mandatory:true},
+    'file': {key: 'f', mandatory:true, multiple: true},
     'tid': {key: 't', args: 1}
   })
 
-  let jsonevents = null
+  let jsonevents = []
+  let files = null
+  if (opt.file.constructor == Array)
+    files = opt.file
+  else
+    files = [opt.file]
   try {
-    const contents = await fs.readFile(opt.file)
-    jsonevents = JSON.parse(contents)
+    for (let file of files) {
+      log(file)
+      const contents = await fs.readFile(file)
+      let parsed = JSON.parse(contents)
+      jsonevents.push(parsed)
+    }
   } catch(e) {
     console.log(e.message)
   };
 
 //  log(JSON.stringify(jsonevents, null, 4))
+//  throw ("asd")
 
 
   let cache = {}
   let ex = {}
   let events = [] //make generic TODO
-  if (opt.tid && jsonevents[opt.tid]) {
+  if (opt.tid && jsonevents[0][opt.tid]) {
     for (let event of jsonevents[opt.tid]) {
       event.symbol = event.amountType + "/" + event.costType
       ex[event.exchange] = true
@@ -51,12 +61,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     events = new Tickers(jsonevents[opt.tid])
   } else {
     events = new Tickers()
-    for (let tid in jsonevents) {
-      for (let event of jsonevents[tid]) {
-        event.symbol = event.amountType + "/" + event.costType
-        ex[event.exchange] = true
+    for (let fileno in jsonevents) {
+      for (let tid in jsonevents[fileno]) {
+        for (let event of jsonevents[fileno][tid]) {
+          event.symbol = event.amountType + "/" + event.costType
+          ex[event.exchange] = true
+        }
+        events.merge(new Tickers(jsonevents[fileno][tid]))
       }
-      events.merge(new Tickers(jsonevents[tid]))
     }
   }
 //  log(JSON.stringify(events, null, 4))
@@ -66,7 +78,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     exchanges.push(exchange)
 
   const rl = Rlsepp.getInstance();
-  await rl.initAsync(exchanges, {enableRateLimit: false})
+  await rl.initAsync(exchanges, {enableRateLimit: true})
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
 
@@ -76,44 +88,46 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   //log(events)
   let books = await rl.fetchOrderBooks(events, {store:false})
-  //log(books)
+  log(books)
 
   let transaction = new IxDictionary()
-  for (let tid in jsonevents) {
-    let lastAmount = null
-    let thisTransaction = []
+  for (let fileno in jsonevents) {
+    for (let tid in jsonevents[fileno]) {
+      let lastAmount = null
 
-    if (opt.tid && opt.tid != tid)
-      continue
-    try {
-      for (let action of jsonevents[tid]) {
-//        log(action)
-        let exchange = action.exchange
-        let symbol = action.amountType + "/"+ action.costType
+      let thisTransaction = []
+      if (opt.tid && opt.tid != tid)
+        continue
+      try {
+        for (let action of jsonevents[fileno][tid]) {
+          //        log(action)
+          let exchange = action.exchange
+          let symbol = action.amountType + "/"+ action.costType
 
-        //next action's cost is the previous actions amount
-        //
-        //ex. buy BTC/USD, amount 1btc cost 7kusd
-        //    buy  ETH/BTC, amount 21eth cost 1btc
-        if (lastAmount != null && action.action == 'buy') {
-          action.cost = lastAmount
+          //next action's cost is the previous actions amount
+          //
+          //ex. buy BTC/USD, amount 1btc cost 7kusd
+          //    buy  ETH/BTC, amount 21eth cost 1btc
+          if (lastAmount != null && action.action == 'buy') {
+            action.cost = lastAmount
+          }
+          try {
+            let newAction = books[exchange][symbol].project(action)
+            lastAmount = newAction.amount 
+            thisTransaction.push(newAction)
+          } catch(e) {
+            throw (new Error(e.message+"\n"+"missing order book from "+exchange+ " for "+symbol))
+          }
         }
-        try {
-          let newAction = books[exchange][symbol].project(action)
-          lastAmount = newAction.amount 
-          thisTransaction.push(newAction)
-        } catch(e) {
-          throw (new Error("missing order book from "+exchange+ " for "+symbol))
-        }
+        transaction[fileno + tid] = thisTransaction
+      } catch(e) {
+        log(e)
       }
-      transaction[tid] = thisTransaction
-    } catch(e) {
-      log(e)
     }
   }
 
-  log("writing file "+opt.file+".corrected containing "+transaction.keys().length + " transactions")
-  var eventFile= fs.createWriteStream(opt.file+".corrected", { flags: 'w' });
+  log("writing file events.corrected containing "+transaction.keys().length + " transactions")
+  var eventFile= fs.createWriteStream("events.corrected", { flags: 'w' });
   eventFile.write(JSON.stringify(transaction, null, 4))
 
 /*
