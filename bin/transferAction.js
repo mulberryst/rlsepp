@@ -62,17 +62,22 @@ function walletValue(wallet) {
 
 (async function main() {
   const rl = Rlsepp.getInstance();
+  await rl.initStorable()
 //  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
 
   let opt = stdio.getopt({
-    'from': {key: 'f', args: 1, mandatory: true, description: "Beginning exchange", multiple: true},
-    'to': {key: 't', args: 1, description: "Ending exchange", multiple: true},
+    'from': {key: 'f', mandatory: true, description: "Beginning exchange"},
+    'to': {key: 't', description: "Ending exchange"},
+    'all': {description: "Attempt brute forcing all transfers possible"},
     'file': {key: 'o', args:1, description: "Specifify output file name"},
     'currency': {key: 'c', args:1},
-    'amount': {key: 'a', args:1}
+    'amount': {key: 'a', args:1},
+    'exchange': {key: 'e', multiple: true}
   });
 
   let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: opt.from}})
+  let originalCoefficient = 1 / wallet['USD'].value
+
   if (opt.wallet)
     wallet = new IxDictionary(JSON.parse(opt.wallet))
 
@@ -81,26 +86,58 @@ function walletValue(wallet) {
     wallet.set(opt.currency, {currency:opt.currency, value: Number(opt.amount), exchange: opt.from})
   }
 
-  let allExchanges = config.get('exchanges')
-  await rl.initAsync(allExchanges, {verbose});
+  let exchanges = rl.getCurrentTickerExchanges()
+  if (opt.exchange && opt.exchange.constructor == Array) {
+    exchanges = opt.exchange
+  }
+
+  // initialize exchanges 
+  //
+  await rl.initAsync(exchanges, {verbose});
 
   let ixAC = rl.arbitrableCommodities(['USDT'])
   let k = [...ixAC.keys()]
 
-  //let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: from}})
 
   let level = 1
   let treeModel =  new TreeModel()
   let treeRoot = treeModel.parse({id:'1', wallet: wallet})
   let treeNode = treeRoot
 
-
-  await rl.retrieve(null, 'tickers')
   let we = walletValue(wallet)
   let wq = we.currency
-  for (let symbol of rl.exchangeMarketsHavingQuote(opt.from, wq)) {
-    let ticker = rl.getTickerByExchange(opt.from,symbol)
-    rl.projectBuyTree(wallet.clone(), opt.from, ticker, treeNode)
+
+
+
+  let spreads = rl.deriveSpreads()
+
+  //  initial buy
+  //
+  //  brute force all 
+  //
+  if (opt.all) {
+    for (let e of rl.getCurrentTickerExchanges()) {
+      for (let symbol of rl.exchangeMarketsHavingQuote(e, wq)) {
+        let ticker = rl.getTickerByExchange(e,symbol)
+
+
+        //  
+        //
+        let leafNode = rl.projectBuyTree(wallet.clone(), e, ticker, treeNode)
+        if (!leadNode.hasChildren()) {
+          let amount = leafNode.model.action.amount
+          if ( ( (amount * originalCoefficient)
+            / spread[we.symbol+"/USD"].meanAmountPerOneUSD
+          ) < 0.95 )
+            leafNode.drop()
+        }
+      }
+    }
+  } else {
+    for (let symbol of rl.exchangeMarketsHavingQuote(opt.from, wq)) {
+      let ticker = rl.getTickerByExchange(opt.from,symbol)
+      rl.projectBuyTree(wallet.clone(), opt.from, ticker, treeNode)
+    }
   }
 
   for (let i = 0; i<=1 ;i++) {

@@ -93,8 +93,10 @@ const sortBy = (array, key, descending = false) => {
 //    console.log(listAC)
 
   let table = []
-  for (let e of tickers) {
-    for (let t of e) {
+  for (let e in tickers) {
+    if (exchanges.indexOf(e) < 0)
+      continue
+    for (let t of tickers[e]) {
       table.push(t)
     }
   }
@@ -164,13 +166,13 @@ const sortBy = (array, key, descending = false) => {
         //
         w[action.costType].value += (action.cost + action.fee)
       }
-      let nextId = (ledgerNode.model.id  * 100)+ (ledgerNode.children.length + 1)
+      let nextId = (ledgerNode.model.id  * 1000)+ (ledgerNode.children.length + 1)
       ledgerNode.addChild(ledgerTree.parse({id: nextId, wallet:w, action: action}))
     }
   }
 
   let cryptoWallets = ledgerRoot.all(function (node) {
-    return node.model.id > 100;
+    return node.model.id > 1000;
   });
   for (let node of cryptoWallets) {
     spreads = rl.projectMoves(node.model.wallet,spreads)
@@ -187,14 +189,14 @@ const sortBy = (array, key, descending = false) => {
           w[action.costType] = {name: action.costType, symbol: action.costType}
           w[action.costType].value = (action.cost - action.fee)
         }
-        let nextId = (node.model.id  * 100)+ (node.children.length + 1)
+        let nextId = (node.model.id  * 1000)+ (node.children.length + 1)
         node.addChild(ledgerTree.parse({id: nextId, wallet:w, action: action}))
       }
     }
   }
 
   let round3 = ledgerRoot.all(function (node) {
-    return node.model.id > 10000;
+    return node.model.id > 1000000;
   });
   for (let node of round3) {
     spreads = rl.projectMoves(node.model.wallet,spreads, 'sell')
