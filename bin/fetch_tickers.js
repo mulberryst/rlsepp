@@ -26,6 +26,7 @@ const logger = log4js.getLogger('file');
     exchanges = opt.args
 
   const rl = Rlsepp.getInstance();
+  await rl.initStorable()
   await rl.initAsync(exchanges, {enableRateLimit: true})
 
   let now = new moment()

@@ -30,9 +30,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   logger.info("initialzing "+exchanges.join(" "))
 
   const rl = Rlsepp.getInstance();
+  await rl.initStorable()
   await rl.initAsync(exchanges, {enableRateLimit: false})
 
-  let dbTickers = await rl.storable.retrieve(null, 'tickers')
+  let dbTickers = rl.tickerByExchange
+    //await rl.storable.retrieve(null, 'tickers')
 
   // of all ticker symbols ccxt market data knows about
   // cross reference with whats in the database 
@@ -41,6 +43,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let r = []
   exchanges.map(name => {
     rl.exchangeMarketSymbols(name).map(s => {
+
       if (dbTickers.has(name) && dbTickers[name].has(s))
         r.push(dbTickers[name][s])
       else 
