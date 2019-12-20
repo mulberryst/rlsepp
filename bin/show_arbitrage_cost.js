@@ -65,24 +65,16 @@ const sortBy = (array, key, descending = false) => {
 
 (async function main() {
   const rl = Rlsepp.getInstance();
+  await rl.initStorable()
+
   let exchanges
-  let storable = new Storable({exchanges:['default']})
-  await storable.init()
-  let tickers = await storable.retrieve(null, 'tickers')
-  for (let e in tickers) {
-    for (let s in tickers[e]) {
-      if (tickers[e][s].age && tickers[e][s].age > 3600)
-        tickers[e].remove(s)
-    }
-  }
-  rl.tickersByExchange = tickers
- 
   let opt = stdio.getopt({
   })
   if (opt.args && opt.args.length > 0) {
     exchanges = opt.args
   } else {
-    exchanges = tickers.keys()
+    exchanges = rl.getCurrentTickerExchanges()
+    log(exchanges)
   }
 
   await rl.initAsync(exchanges, {verbose});
@@ -92,19 +84,10 @@ const sortBy = (array, key, descending = false) => {
     let listAC = rl.arbitrableCommodities(['USDT'])
 //    console.log(listAC)
 
-  let table = []
-  for (let e in tickers) {
-    if (exchanges.indexOf(e) < 0)
-      continue
-    for (let t of tickers[e]) {
-      table.push(t)
-    }
-  }
-
   let wt = rl.basis.clone()
-  let spreads = rl.deriveSpreads( table )
+  let spreads = rl.deriveSpreads( )
 
-//  log (JSON.stringify(spreads,null,4))
+  log (JSON.stringify(spreads,null,4))
 
 //Utilizing an N-ary tree data type for spreads to emulate the functionality of a 
 //  wallet might be the way to go for projections.
@@ -212,7 +195,7 @@ const sortBy = (array, key, descending = false) => {
           w[action.costType] = {name: action.costType, symbol: action.costType}
           w[action.costType].value = (action.cost - action.fee)
         }
-        let nextId = (node.model.id  * 100)+ (node.children.length + 1)
+        let nextId = (node.model.id  * 1000)+ (node.children.length + 1)
         node.addChild(ledgerTree.parse({id: nextId, wallet:w, action: action}))
       }
     }
