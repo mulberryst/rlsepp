@@ -17,7 +17,6 @@ const config = require('config')
   , Storable = require('librlsepp/js/lib/storable').Storable
 ;
 
-var outFile= fs.createWriteStream('orderbook_summary.json', { flags: 'w' });
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
@@ -26,6 +25,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let exchanges = []
   let opt = stdio.getopt({
     'file': {key: 'f', mandatory:true, multiple: true},
+    'write': {key: 'w', args: 1},
     'tid': {key: 't', args: 1}
   })
 
@@ -54,11 +54,12 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let ex = {}
   let events = [] //make generic TODO
   if (opt.tid && jsonevents[0][opt.tid]) {
-    for (let event of jsonevents[opt.tid]) {
+    for (let event of jsonevents[0][opt.tid]) {
       event.symbol = event.amountType + "/" + event.costType
       ex[event.exchange] = true
     }
-    events = new Tickers(jsonevents[opt.tid])
+    events = new Tickers(jsonevents[0][opt.tid])
+
   } else {
     events = new Tickers()
     for (let fileno in jsonevents) {
@@ -108,8 +109,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
           //
           //ex. buy BTC/USD, amount 1btc cost 7kusd
           //    buy  ETH/BTC, amount 21eth cost 1btc
-          if (lastAmount != null && action.action == 'buy') {
-            action.cost = lastAmount
+          if (lastAmount != null) {
+            if (action.action == 'buy')
+              action.cost = lastAmount
+            if (action.action == 'sell')
+              action.amount = lastAmount
           }
           try {
             let newAction = books[exchange][symbol].project(action)
@@ -126,14 +130,19 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     }
   }
 
-  log("writing file events.corrected containing "+transaction.keys().length + " transactions")
-  var eventFile= fs.createWriteStream("events.corrected", { flags: 'w' });
+
+  let fileName = "events."+process.pid+".corrected.json"
+  if (opt.write)
+    fileName = opt.write
+  log("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
+  var eventFile= fs.createWriteStream(fileName, { flags: 'w' });
   eventFile.write(JSON.stringify(transaction, null, 4))
 
 /*
   let count = 0
   let  out = ""
   let table = []
+var outFile= fs.createWriteStream('orderbook_summary.json', { flags: 'w' });
   for (let exchange in orderBooks) {
     for (let book of orderBooks[exchange]) {
       let asks = book.sum(book.asks)

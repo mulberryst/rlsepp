@@ -103,7 +103,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //      console.log(JSON.stringify(table,null,4))
 //      console.log(asTable(table))
 //      let tweet = out.filter(el => el[1] > opt.notify).map(el => el[0])
-      rl.notify(tweet.join("\n"))
+      if (tweet.length > 0)
+        rl.notify(tweet.join("\n"))
     }
     log(count + " transactions in file")
   }

@@ -69,6 +69,7 @@ const sortBy = (array, key, descending = false) => {
 
   let exchanges
   let opt = stdio.getopt({
+    'write': {key: 'w', args: 1}
   })
   if (opt.args && opt.args.length > 0) {
     exchanges = opt.args
@@ -246,6 +247,10 @@ const sortBy = (array, key, descending = false) => {
 //  rl.notify(message.join("\n"), 'synopsis');
   console.log(message.join("\n"));
 
+  let fileName = 'events.minmax.json'
+  if (opt.write)
+    fileName = opt.write
+  var eventFile= fs.createWriteStream(fileName, { flags: 'w' }); 
   eventFile.write(JSON.stringify(transaction, null, 4))
 
   //ledgerNode.walk({strategy: 'breadth'}, node => console.log(node))
