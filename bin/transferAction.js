@@ -66,7 +66,7 @@ function walletValue(wallet) {
 //  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
 
   let opt = stdio.getopt({
-    'from': {key: 'f', mandatory: true, description: "Beginning exchange"},
+    'from': {key: 'f', description: "Beginning exchange"},
     'to': {key: 't', description: "Ending exchange"},
     'all': {description: "Attempt brute forcing all transfers possible"},
     'file': {key: 'o', args:1, description: "Specifify output file name"},
@@ -91,6 +91,8 @@ function walletValue(wallet) {
     exchanges = opt.exchange
   }
 
+  log(exchanges)
+
   // initialize exchanges 
   //
   await rl.initAsync(exchanges, {verbose});
@@ -107,8 +109,6 @@ function walletValue(wallet) {
   let we = walletValue(wallet)
   let wq = we.currency
 
-
-
   let spreads = rl.deriveSpreads()
 
   //  initial buy
@@ -119,15 +119,32 @@ function walletValue(wallet) {
     for (let e of rl.getCurrentTickerExchanges()) {
       for (let symbol of rl.exchangeMarketsHavingQuote(e, wq)) {
         let ticker = rl.getTickerByExchange(e,symbol)
-
-
-        //  
+        if (ticker == null) {
+//          log("No ticker data from "+e+" for "+symbol)
+          continue
+        }
         //
         let leafNode = rl.projectBuyTree(wallet.clone(), e, ticker, treeNode)
-        if (!leadNode.hasChildren()) {
+
+        if (!leafNode.hasChildren() && leafNode.model.action) { //is a child, projectBuy happened
           let amount = leafNode.model.action.amount
-          if ( ( (amount * originalCoefficient)
-            / spread[we.symbol+"/USD"].meanAmountPerOneUSD
+          let we = walletValue(leafNode.model.wallet)
+          if (typeof we === 'undefined') {
+            leafNode.drop()
+            continue
+          }
+
+          let spread = spreads[we.currency+"/USD"]
+//          log("spread for "+we.currency+"/USD")
+//          log(spread)
+          if (typeof spread === 'undefined') {
+            leafNode.drop()
+            continue
+          }
+          //re-base the amount on a mean average price for one sided amount comparison
+          //
+          if ( spread && ( (amount * originalCoefficient)
+            / spreads[we.currency+"/USD"].meanAmountPerOneUSD
           ) < 0.95 )
             leafNode.drop()
         }
@@ -183,10 +200,14 @@ function walletValue(wallet) {
     let entry = walletValue(node.model.wallet)
     if (typeof entry === 'undefined')
       continue
+    try {
     if (opt.to && typeof rl.getTickerByExchange(opt.to,entry.currency+"/USD") !== 'undefined') {
       if (rl.canWithdraw(entry.exchange, entry.currency)) {
         rl.projectSellTree(node.model.wallet.clone(), opt.to, rl.getTickerByExchange(opt.to,entry.currency+"/USD"), node)
       }
+    }
+    } catch(e) {
+      log(e)
     }
   }
 
@@ -194,6 +215,7 @@ function walletValue(wallet) {
   let transaction = {}
 
 
+  let final = []
   for (let node of treeRoot.all(function (node) { 
     return  node.model.wallet.has('USD') && node.model.wallet.USD.value > 0
       && (node.model.wallet.USD.value > (wallet.USD.value - (wallet.USD.value * 0.05)))
@@ -201,6 +223,11 @@ function walletValue(wallet) {
   }).sort((a,b) => 
     ((a.model.wallet.USD.value < b.model.wallet.USD.value) ? -1 : (a.model.wallet.USD.value > b.model.wallet.USD.value) ? 1 : 0)
   )) {
+    final.push(node)
+  }
+ 
+ for (let node of final)
+  {
     let tweet = ""
     let path = node.getPath()
     let events = []

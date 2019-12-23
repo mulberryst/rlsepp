@@ -66,6 +66,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       for (let tid in jsonevents[fileno]) {
         for (let event of jsonevents[fileno][tid]) {
           event.symbol = event.amountType + "/" + event.costType
+
+
+
           ex[event.exchange] = true
         }
         events.merge(new Tickers(jsonevents[fileno][tid]))
@@ -79,6 +82,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     exchanges.push(exchange)
 
   const rl = Rlsepp.getInstance();
+  await rl.initStorable()
   await rl.initAsync(exchanges, {enableRateLimit: true})
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
@@ -89,7 +93,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   //log(events)
   let books = await rl.fetchOrderBooks(events, {store:false})
-  log(books)
+//  log(books)
 
   let transaction = new IxDictionary()
   for (let fileno in jsonevents) {
@@ -99,6 +103,34 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       let thisTransaction = []
       if (opt.tid && opt.tid != tid)
         continue
+
+      // vet the transactions against
+      // exchange specific exceptions
+      // and insert specific move operations
+      //
+      try {
+        let lastAction = null
+        for (let action of jsonevents[fileno][tid]) {
+          rl.applyExceptions(action)
+
+          let exchange = action.exchange
+          if (lastAction != null) {
+            if (lastAction.exchange != action.exchange) {
+              if (a.action == 'buy')
+                if (!rl.canWithdraw(lastAction.exchange, action.costType))
+                  throw(new Error("cannot move "+action.costType+" from "+lastAction.exchange))
+              if (action.action == 'sell')
+                if (!rl.canWithdraw(lastAction.exchange, action.amountType))
+                  throw(new Error("cannot move "+action.amountType+" from "+lastAction.exchange))
+            }
+          }
+          lastAction = action
+        }
+      } catch(e) {
+        log(e)
+        continue
+      }
+
       try {
         for (let action of jsonevents[fileno][tid]) {
           //        log(action)
