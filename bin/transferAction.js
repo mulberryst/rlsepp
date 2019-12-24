@@ -60,14 +60,31 @@ function walletValue(wallet) {
   return r[0]
 }
 
+function walletValueMeanUSD(wallet, spreads) {
+  let spread = null
+  let we = walletValue(wallet)
+  if (we) {
+    if (we.currency == "USD")
+      return we.value
+    spread = spreads[we.currency+"/USD"]
+  }
+  if (typeof spread === 'undefined') {
+    return 0
+   // throw(new Error("No spread for "+we.currency+" in USD"))
+  }
+
+  //re-base the amount on a mean average price for one sided amount comparison
+  return we.value / spreads[we.currency+"/USD"].meanAmountPerOneUSD 
+}
+
 (async function main() {
   const rl = Rlsepp.getInstance();
   await rl.initStorable()
 //  let ixExchanges = new IxDictionary(["yobit", "livecoin", "gemini", "crex24", "cex"])
 
   let opt = stdio.getopt({
-    'from': {key: 'f', description: "Beginning exchange"},
-    'to': {key: 't', description: "Ending exchange"},
+    'from': {key: 'f',args: 1, description: "Beginning exchange"},
+    'to': {key: 't', args: 1,description: "Ending exchange"},
     'all': {description: "Attempt brute forcing all transfers possible"},
     'file': {key: 'o', args:1, description: "Specifify output file name"},
     'currency': {key: 'c', args:1},
@@ -91,7 +108,7 @@ function walletValue(wallet) {
     exchanges = opt.exchange
   }
 
-  log(exchanges)
+  log(exchanges.join(" "))
 
   // initialize exchanges 
   //
@@ -111,6 +128,8 @@ function walletValue(wallet) {
 
   let spreads = rl.deriveSpreads()
 
+//  log(walletValueMeanUSD(wallet, spreads))
+
   //  initial buy
   //
   //  brute force all 
@@ -125,29 +144,18 @@ function walletValue(wallet) {
         }
         //
         let leafNode = rl.projectBuyTree(wallet.clone(), e, ticker, treeNode)
+        /*
 
         if (!leafNode.hasChildren() && leafNode.model.action) { //is a child, projectBuy happened
-          let amount = leafNode.model.action.amount
-          let we = walletValue(leafNode.model.wallet)
-          if (typeof we === 'undefined') {
-            leafNode.drop()
-            continue
+          let value = 0
+          try {
+            value = walletValueMeanUSD(leafNode.model.wallet, spreads)
+          } catch(e) {
           }
-
-          let spread = spreads[we.currency+"/USD"]
-//          log("spread for "+we.currency+"/USD")
-//          log(spread)
-          if (typeof spread === 'undefined') {
-            leafNode.drop()
-            continue
-          }
-          //re-base the amount on a mean average price for one sided amount comparison
-          //
-          if ( spread && ( (amount * originalCoefficient)
-            / spreads[we.currency+"/USD"].meanAmountPerOneUSD
-          ) < 0.95 )
+          if (value < (wallet.USD.value + (wallet.USD.value - (wallet.USD.value * 0.05))))
             leafNode.drop()
         }
+        */
       }
     }
   } else {
@@ -171,16 +179,27 @@ function walletValue(wallet) {
       for (let name of rl.dictExchange.keys()) {
         for (let symbol of rl.exchangeMarketsHavingQuote(name, quote)) {
           if (typeof rl.getTickerByExchange(name,symbol) !== 'undefined') {
-//            log(symbol)
             if (quote == 'USD' && name != entry.exchange)
               continue
+            let leafNode=   rl.projectBuyTree(node.model.wallet.clone(), name, rl.getTickerByExchange(name,symbol), node)
 //            console.log(name + " " + symbol + JSON.stringify(node.model.wallet))
-            rl.projectBuyTree(node.model.wallet.clone(), name, rl.getTickerByExchange(name,symbol), node)
+/*
+           let leafNode=   rl.projectBuyTree(node.model.wallet.clone(), name, rl.getTickerByExchange(name,symbol), node)
+        if (!leafNode.hasChildren() && leafNode.model.action) { //is a child, projectBuy happened
+          let value = 0
+          try {
+            value = walletValueMeanUSD(leafNode.model.wallet, spreads)
+          } catch(e) {
+          }
+          if (value < (wallet.USD.value + (wallet.USD.value - (wallet.USD.value * 0.05))))
+            leafNode.drop()
+        }
+          */
           }
         }
         if ( node.model.action.action == 'buy' && node.model.action.exchange == name)
           continue
-        if (typeof rl.getTickerByExchange(name,entry.currency+"/USD") !== 'undefined') {
+        if (typeof rl.getTickerByExchange(name,entry.currency+"/USD") !== 'undefined' && opt.to) {
           if (rl.canWithdraw(entry.exchange, entry.currency)) {
             rl.projectSellTree(node.model.wallet.clone(), opt.to, rl.getTickerByExchange(name,entry.currency+"/USD"), node)
           }
@@ -212,19 +231,34 @@ function walletValue(wallet) {
   }
 
   level *= 1000
-  let transaction = {}
+  let transaction = new IxDictionary()
 
 
   let final = []
-  for (let node of treeRoot.all(function (node) { 
-    return  node.model.wallet.has('USD') && node.model.wallet.USD.value > 0
-      && (node.model.wallet.USD.value > (wallet.USD.value - (wallet.USD.value * 0.05)))
-      && (node.model.wallet.USD.value < (wallet.USD.value + (wallet.USD.value * 10)))
-  }).sort((a,b) => 
-    ((a.model.wallet.USD.value < b.model.wallet.USD.value) ? -1 : (a.model.wallet.USD.value > b.model.wallet.USD.value) ? 1 : 0)
-  )) {
-    final.push(node)
+  if (opt.all) {
+    for (let node of treeRoot.all(function (node) {
+      let value = 0
+      try {
+        value = walletValueMeanUSD(leafNode.model.wallet, spreads)
+      } catch(e) {
+      }
+      return value > (wallet.USD.value + (wallet.USD.value - (wallet.USD.value * 0.05)))
+    })) {
+      final.push(node)
+    }
+  } else {
+    for (let node of treeRoot.all(function (node) { 
+      return  node.model.wallet.has('USD') && node.model.wallet.USD.value > 0
+        && (node.model.wallet.USD.value > (wallet.USD.value - (wallet.USD.value * 0.05)))
+        && (node.model.wallet.USD.value < (wallet.USD.value + (wallet.USD.value * 10)))
+    })) {
+      final.push(node)
+    }
   }
+  final.sort((a,b) => 
+    ((walletValueMeanUSD(a.model.wallet, spreads) < walletValueMeanUSD(b.model.wallet, spreads)) ? -1 :
+      (walletValueMeanUSD(a.model.wallet, spreads) > walletValueMeanUSD(b.model.wallet, spreads)) ? 1 : 0)
+  )
  
  for (let node of final)
   {
@@ -247,7 +281,10 @@ function walletValue(wallet) {
         }
       }
     }
-    tweet = tweet + util.format("%d", node.model.wallet.USD.value);
+    tweet = tweet + util.format("%d", walletValueMeanUSD(node.model.wallet, spreads));
+    let entry = walletValue(node.model.wallet)
+    if (entry && entry.currency != 'USD')
+      tweet += " actual "+entry.currency
     console.log(node.model.id + " " + tweet)
     transaction[node.model.id] = events
 
@@ -256,7 +293,11 @@ function walletValue(wallet) {
   if (wallet.has("USD"))
     console.log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
 
-  var fileName = opt.file || 'events.transfer.'+opt.from+'.json'
+
+  let fileName = "events.transfer."+process.pid+".json"
+  if (opt.write)
+    fileName = opt.write
+  log("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
   var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
   eventFile.write(JSON.stringify(transaction, null, 4))
 
