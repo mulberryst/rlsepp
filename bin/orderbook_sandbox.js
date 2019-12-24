@@ -53,7 +53,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let cache = {}
   let ex = {}
   let events = [] //make generic TODO
+
+  //  determine which exchanges to init
+  //
   if (opt.tid && jsonevents[0][opt.tid]) {
+  //  mainly for testings
     for (let event of jsonevents[0][opt.tid]) {
       event.symbol = event.amountType + "/" + event.costType
       ex[event.exchange] = true
@@ -61,22 +65,15 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     events = new Tickers(jsonevents[0][opt.tid])
 
   } else {
-    events = new Tickers()
     for (let fileno in jsonevents) {
       for (let tid in jsonevents[fileno]) {
         for (let event of jsonevents[fileno][tid]) {
           event.symbol = event.amountType + "/" + event.costType
-
-
-
           ex[event.exchange] = true
         }
-        events.merge(new Tickers(jsonevents[fileno][tid]))
       }
     }
   }
-//  log(JSON.stringify(events, null, 4))
-
 
   for (let exchange in ex)
     exchanges.push(exchange)
@@ -84,6 +81,41 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   const rl = Rlsepp.getInstance();
   await rl.initStorable()
   await rl.initAsync(exchanges, {enableRateLimit: true})
+  
+
+    //  apply exceptions before seeking order books
+    //
+    events = new Tickers()
+    for (let fileno in jsonevents) {
+      for (let tid in jsonevents[fileno]) {
+        try {
+          let lastAction = null
+          for (let event of jsonevents[fileno][tid]) {
+//            console.log(JSON.stringify(event))
+//            log(JSON.stringify(rl.exchangeExceptions,null, 4))
+            rl.applyExceptions(event)
+            if (lastAction != null) {
+              if (lastAction.exchange != event.exchange) {
+                if (event.event == 'buy')
+                  if (!rl.canWithdraw(lastAction.exchange, event.costType))
+                    throw(new Error("cannot move "+event.costType+" from "+lastAction.exchange))
+                if (event.event == 'sell')
+                  if (!rl.canWithdraw(lastAction.exchange, event.amountType))
+                    throw(new Error("cannot move "+event.amountType+" from "+lastAction.exchange))
+              }
+            }
+            lastAction = event
+          }
+          events.merge(new Tickers(jsonevents[fileno][tid]))
+        } catch(e) {
+          log(e.message)
+          delete jsonevents[fileno][tid]
+        }
+      }
+    }
+//  log(JSON.stringify(events, null, 4))
+
+
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
 
@@ -103,33 +135,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       let thisTransaction = []
       if (opt.tid && opt.tid != tid)
         continue
-
-      // vet the transactions against
-      // exchange specific exceptions
-      // and insert specific move operations
-      //
-      try {
-        let lastAction = null
-        for (let action of jsonevents[fileno][tid]) {
-          rl.applyExceptions(action)
-
-          let exchange = action.exchange
-          if (lastAction != null) {
-            if (lastAction.exchange != action.exchange) {
-              if (a.action == 'buy')
-                if (!rl.canWithdraw(lastAction.exchange, action.costType))
-                  throw(new Error("cannot move "+action.costType+" from "+lastAction.exchange))
-              if (action.action == 'sell')
-                if (!rl.canWithdraw(lastAction.exchange, action.amountType))
-                  throw(new Error("cannot move "+action.amountType+" from "+lastAction.exchange))
-            }
-          }
-          lastAction = action
-        }
-      } catch(e) {
-        log(e)
-        continue
-      }
 
       try {
         for (let action of jsonevents[fileno][tid]) {
