@@ -179,6 +179,7 @@ function walletValueMeanUSD(wallet, spreads) {
           continue
         }
         //
+        log("seeding tree with "+symbol+" from "+e)
         let leafNode = rl.projectBuyTree(wallet.clone(), e, ticker, treeNode)
         /*
 
@@ -283,14 +284,15 @@ function walletValueMeanUSD(wallet, spreads) {
         }
           */
           }
-        }
-        if ( node.model.action.action == 'buy' && node.model.action.exchange == name)
-          continue
-        if (typeof rl.getTickerByExchange(name,entry.currency+"/USD") !== 'undefined' && opt.to) {
-          if (rl.canWithdraw(entry.exchange, entry.currency)) {
-            rl.projectSellTree(node.model.wallet.clone(), opt.to, rl.getTickerByExchange(name,entry.currency+"/USD"), node)
+
+          if ( node.model.action.action == 'buy' && node.model.action.exchange == name)
+            continue
+          if (typeof rl.getTickerByExchange(name,entry.currency+"/USD") !== 'undefined') {
+            if (rl.canWithdraw(entry.exchange, entry.currency)) {
+              rl.projectSellTree(node.model.wallet.clone(), name, rl.getTickerByExchange(name,entry.currency+"/USD"), node)
+            }
           }
-        }
+        } //buy
       }
     }
   }
@@ -329,7 +331,7 @@ function walletValueMeanUSD(wallet, spreads) {
       let value = 0
       countTotal++
       try {
-        value = walletValueMeanUSD(leafNode.model.wallet, spreads)
+        value = walletValueMeanUSD(node.model.wallet, spreads)
       } catch(e) {
       }
       return value > (wallet.USD.value + (wallet.USD.value - (wallet.USD.value * 0.05)))
@@ -346,6 +348,7 @@ function walletValueMeanUSD(wallet, spreads) {
       final.push(node)
     }
   }
+  log("total tree count "+countTotal+", passing "+countPassing)
   final.sort((a,b) => 
     ((walletValueMeanUSD(a.model.wallet, spreads) < walletValueMeanUSD(b.model.wallet, spreads)) ? -1 :
       (walletValueMeanUSD(a.model.wallet, spreads) > walletValueMeanUSD(b.model.wallet, spreads)) ? 1 : 0)
@@ -384,7 +387,6 @@ function walletValueMeanUSD(wallet, spreads) {
   if (wallet.has("USD"))
     console.log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
 
-  console.log("total tree count "+countTotal)
   let fileName = "events.transfer."+process.pid+".json"
   if (opt.write)
     fileName = opt.write
