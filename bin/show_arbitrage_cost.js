@@ -69,12 +69,13 @@ const sortBy = (array, key, descending = false) => {
 
   let exchanges
   let opt = stdio.getopt({
-    'write': {key: 'w', args: 1}
+    'write': {key: 'w', args: 1},
+    'min': {key:'m', args:1}
   })
   if (opt.args && opt.args.length > 0) {
     exchanges = opt.args
   } else {
-    exchanges = rl.getCurrentTickerExchanges()
+    exchanges = await rl.getCurrentTickerExchanges()
     log(exchanges)
   }
 
@@ -202,8 +203,11 @@ const sortBy = (array, key, descending = false) => {
     }
   }
 
+  let min = 950
+  if (opt.min)
+    min = opt.min
   let endGame = ledgerRoot.all(function (node) {
-    return node.model.wallet['USD'].value > 950;
+    return node.model.wallet['USD'].value > min;
   });
 
   //  

@@ -3,7 +3,10 @@ const config = require('config')
   , stdio = require('stdio')
   , Rlsepp = require('librlsepp').Rlsepp
   , IxDictionary = require('librlsepp').IxDictionary
+  , Event = require('librlsepp').Event
+  , Events = require('librlsepp').Events
   , Ticker = require('librlsepp').Ticker
+  , Tickers = require('librlsepp').Tickers
   , Spread = require('librlsepp').Spread
   , Spreads = require('librlsepp').Spreads
   , Storable = require('librlsepp').Storable
@@ -48,6 +51,30 @@ const sortBy = (array, key, descending = false) => {
      descending = descending ? -1 : 1
      return array.sort ((a, b) => ((a[key] < b[key]) ? -descending : ((a[key] > b[key]) ? descending : 0)))
 }
+// let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: opt.from}})
+class Wallet extends IxDictionary {
+  constructor(obj) {
+  }
+}
+
+function walletFromEvent(event=null) {
+//  if (!event instanceof Event) throw (new Error("walletFromEvent passed invalid object"+event))
+  let wallet = new IxDictionary()
+  let currency = null
+  let amount = 0
+  if (event && event.exchange && event.amountType && event.amount && event.amount > 0) {
+      if (ev.action == "buy" ) {
+        currency = event.amountType
+        amount = event.amount
+      }
+      if (ev.action == "sell" ) {
+        currency = event.costType
+        amount = event.cost
+      }
+    wallet.set(amount, {currency:currency, value: Number(amount), exchange: event.exchange})
+  }
+  return wallet
+}
 
 function walletValue(wallet) {
   let r = []
@@ -57,6 +84,8 @@ function walletValue(wallet) {
   }
   if (r.length > 1)
     throw new Error("wallet should only have one value " + JSON.stringify(wallet))
+  if (r.lengh == 0 || typeof r[0] === 'undefined')
+    r.push({USD:{currency:"USD", value:0}})
   return r[0]
 }
 
@@ -86,11 +115,14 @@ function walletValueMeanUSD(wallet, spreads) {
     'from': {key: 'f',args: 1, description: "Beginning exchange"},
     'to': {key: 't', args: 1,description: "Ending exchange"},
     'all': {description: "Attempt brute forcing all transfers possible"},
-    'file': {key: 'o', args:1, description: "Specifify output file name"},
+    'file': {args:1, description: "examine events file, use from and to from file"},
+    'write': {key: 'w', args:1, description: "Specifify output file name"},
     'currency': {key: 'c', args:1},
     'amount': {key: 'a', args:1},
     'exchange': {key: 'e', multiple: true}
   });
+
+
 
   let wallet = new IxDictionary({"USD": {currency:"USD", value: 1000, exchange: opt.from}})
   let originalCoefficient = 1 / wallet['USD'].value
@@ -113,6 +145,7 @@ function walletValueMeanUSD(wallet, spreads) {
   // initialize exchanges 
   //
   await rl.initAsync(exchanges, {verbose});
+
 
   let ixAC = rl.arbitrableCommodities(['USDT'])
   let k = [...ixAC.keys()]
@@ -139,7 +172,10 @@ function walletValueMeanUSD(wallet, spreads) {
       for (let symbol of rl.exchangeMarketsHavingQuote(e, wq)) {
         let ticker = rl.getTickerByExchange(e,symbol)
         if (ticker == null) {
-//          log("No ticker data from "+e+" for "+symbol)
+          //remove ticker symbol from cache of exchangeMarketsHavingQuote
+          //this one could be expensive
+          rl.dictExchange[e].symbolsByQuote[wq].remove(symbol)
+          log("No ticker data from "+e+" for "+symbol)
           continue
         }
         //
@@ -158,6 +194,57 @@ function walletValueMeanUSD(wallet, spreads) {
         */
       }
     }
+  } else if (opt.file) {
+    let jsonevents = null
+    try {
+      const contents = await fs.readFile(opt.file)
+      jsonevents = JSON.parse(contents)
+    } catch(e) {
+      console.log(e.message)
+    };
+    let fromEv = new Events()
+    let toEv = new Events()
+    for (let tid in jsonevents) {
+      let transaction = jsonevents[tid]
+      try {
+        let last = transaction[transaction.length - 1]
+        fromEv.merge(new Events([last]))
+        toEv.merge(new Events([transaction[0]]))
+      } catch(e) {
+        log(e)
+      }
+    }
+    for (let name in fromEv) {
+      for (let ev of fromEv[name]) {
+        let currency = null
+        let amount = 0
+        try {
+          let w = walletFromEvent(ev)
+          let v = walletValue(w)
+
+          if (rl.canWithdraw(ev.exchange, v.currency)) {
+            for (let e of rl.getCurrentTickerExchanges()) {
+              if (e != ev.exchange) {
+                for (let symbol of rl.exchangeMarketsHavingQuote(e, v.currency)) {
+                  let ticker = rl.getTickerByExchange(e,symbol)
+                  log("seeding tree with "+e+":"+v.currency)
+                  let leafNode = rl.projectBuyTree(w.clone(), e, ticker, treeNode)
+                }
+              }
+            }
+          } else {
+            for (let symbol of rl.exchangeMarketsHavingQuote(ev.exchange, v.currency)) {
+              let ticker = rl.getTickerByExchange(ev.exchange,symbol)
+              log("seeding tree with "+ev.exchange+":"+v.currency)
+              let leafNode = rl.projectBuyTree(w.clone(), ev.exchange, ticker, treeNode)
+            }
+          }
+        } catch(e) {
+          log("bad wallet from: "+ev)
+        }
+      }
+    }
+
   } else {
     for (let symbol of rl.exchangeMarketsHavingQuote(opt.from, wq)) {
       let ticker = rl.getTickerByExchange(opt.from,symbol)
@@ -235,15 +322,19 @@ function walletValueMeanUSD(wallet, spreads) {
 
 
   let final = []
+  let countTotal = 0
+  let countPassing = 0
   if (opt.all) {
     for (let node of treeRoot.all(function (node) {
       let value = 0
+      countTotal++
       try {
         value = walletValueMeanUSD(leafNode.model.wallet, spreads)
       } catch(e) {
       }
       return value > (wallet.USD.value + (wallet.USD.value - (wallet.USD.value * 0.05)))
     })) {
+      countPassing++
       final.push(node)
     }
   } else {
@@ -293,7 +384,7 @@ function walletValueMeanUSD(wallet, spreads) {
   if (wallet.has("USD"))
     console.log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
 
-
+  console.log("total tree count "+countTotal)
   let fileName = "events.transfer."+process.pid+".json"
   if (opt.write)
     fileName = opt.write
