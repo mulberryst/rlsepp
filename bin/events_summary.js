@@ -15,6 +15,7 @@ const config = require('config')
   , Tickers = require('librlsepp').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
+  , sprintf = require('sprintf-js').sprintf
 ;
 
 
@@ -58,6 +59,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       try {
         let lastExchange = null
         let rows = [[tid,"","","","amount","","","orders","cost"]]
+        let costBasis = jsonevents[tid][0].action.cost
         for (let aid in jsonevents[tid]) {
           let a = jsonevents[tid][aid]
           if (lastExchange && a.exchange != lastExchange) {
@@ -75,15 +77,16 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
             tweet = tweet + util.format("%s %s %s/%s %s %d", a.action, a.exchange, a.amountType, a.costType, a.priceType, a.price);
           } 
           if (a.orders) {
-            let cost = 
             rows.push(["", a.action, a.exchange, a.amountType + "/" + a.costType, a.amount,a.priceType, a.price, a.orders.length,a.cost])
             tweet += " orders " + a.orders.length + "|"
           } else 
             tweet = tweet + "|"
-          if (a.action == 'sell') {
-            tweet += a.cost
+
+          if (a.action == 'sell' && aid == (jsonevents[tid].length - 1)) {
+            tweet += sprintf("$%0.2f",a.cost)
             if (!dupCheck.has(tweet)) {
               dupCheck.set(tweet, 1)
+              //all sales
               out.push([tid+ " " + tweet,a.cost])
               if (opt.notify && a.cost >= opt.notify)
                 table.push(rows)
@@ -98,13 +101,30 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     out.map(el => console.log(el[0]))
     if (opt.notify) {
       let tweet = []
+      let subject = []
+      let topN = 5
       table.sort((a,b) => ((a[a.length-1][8] < b[b.length-1][8]) ? 1 : (a[a.length-1][8] > b[b.length-1][8]) ? -1 : 0))
-        .map(el => tweet.push(asTableLog(el)+"\n"))
+        .map(el => {
+          tweet.push(asTableLog(el)+"\n")
+          let costBasis = el[1][8]
+          let finalAct = el[el.length-1]
+//          log(costBasis + " " + finalAct)
+          if (finalAct[1] == 'sell' && topN > 0) {
+            topN -= 1
+            let profitBasis = ((finalAct[8] - costBasis)/costBasis)*1000
+            subject.push(sprintf("%0.0f ",Math.round(profitBasis)))
+//            subject += profitPercent
+          }
+        })
+      log(subject)
+
 //      console.log(JSON.stringify(table,null,4))
 //      console.log(asTable(table))
 //      let tweet = out.filter(el => el[1] > opt.notify).map(el => el[0])
-      if (tweet.length > 0)
-        rl.notify(tweet.join("\n"))
+      if (tweet.length > 0) {
+        log("sending notification")
+        await rl.notify(tweet.join("\n"),subject.join(","))
+      }
     }
     log(count + " transactions in file")
   }

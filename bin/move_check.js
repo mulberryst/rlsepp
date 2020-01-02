@@ -12,6 +12,7 @@ const config = require('config')
   , asTable = require ('as-table').configure ({ title: x => x.bright, delimiter: ' | '.dim.cyan, dash: '-'.bright.cyan })
   , asTableLog = require ('as-table').configure ({ title: x => x, delimiter: ' | ', dash: '-' })
   , Rlsepp = require('librlsepp').Rlsepp
+  , Event = require('librlsepp').Event
   , Tickers = require('librlsepp').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
@@ -82,103 +83,109 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   const rl = Rlsepp.getInstance();
   await rl.initStorable()
   await rl.initAsync(exchanges, {enableRateLimit: true})
-  
+ 
 
-    //  apply exceptions before seeking order books
-    //
-    events = new Tickers()
-    for (let fileno in jsonevents) {
-      for (let tid in jsonevents[fileno]) {
-        if (opt.tid && tid != opt.tid)
-          continue 
-
-        try {
-          let lastAction = null
-          for (let event of jsonevents[fileno][tid]) {
-//            console.log(JSON.stringify(event))
-//            log(JSON.stringify(rl.exchangeExceptions,null, 4))
-            rl.applyExceptions(event)
-            if (lastAction != null) {
-              if (lastAction.exchange != event.exchange) {
-                if (event.event == 'buy')
-                  if (!rl.canWithdraw(lastAction.exchange, event.costType))
-                    throw(new Error("cannot move "+event.costType+" from "+lastAction.exchange))
-                if (event.event == 'sell')
-                  if (!rl.canWithdraw(lastAction.exchange, event.amountType))
-                    throw(new Error("cannot move "+event.amountType+" from "+lastAction.exchange))
-              }
-            }
-            lastAction = event
-          }
-          events.merge(new Tickers(jsonevents[fileno][tid]))
-        } catch(e) {
-          log(e.message)
-          delete jsonevents[fileno][tid]
-        }
-      }
-    }
-//  log(JSON.stringify(events, null, 4))
-
+  let spreads = rl.deriveSpreads( )
 
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
 
-
-  let cacheBookTree = new IxDictionary()
-  let orderBooks = null
-
-  //log(events)
-  let books = await rl.fetchOrderBooks(events, {store:false})
-//  log(books)
-
+  let ixMoves = new IxDictionary()
+  let ixDeposit = new IxDictionary()
+  let ixWithdraw = new IxDictionary()
   let transaction = new IxDictionary()
+
+
+  //  add explicit move events, cache them for api verification
+  //
   for (let fileno in jsonevents) {
     for (let tid in jsonevents[fileno]) {
-      let lastAmount = null
-
 
       if (opt.tid && opt.tid != tid)
         continue
 
-      try {
-        let thisTransaction = rl.adjustActions(jsonevents[fileno][tid])
-        transaction[fileno + tid] = thisTransaction
-      } catch(e) {
-        log(e)
+      let events = []
+      for (let i in jsonevents[fileno][tid]) {
+        let a = jsonevents[fileno][tid][i]
+        try {
+          let last = jsonevents[fileno][tid][i-1]
+          if (last && last.exchange != a.exchange && a.action != "move") {
+            if (last.action == 'buy') {
+              let e = new Event({
+                action:"move",
+                exchange:a.exchange,
+                fromExchange:last.exchange,
+                amountType:a.amountType,
+                amount:a.amount,
+                costType:a.amountType,
+                cost:1,
+                tid:null
+              })
+              ixMoves[e.exchange+e.fromExchange+e.amountType] = e
+              ixWithdraw[e.fromExchange] = e.amountType
+              ixDeposit[e.exchange] = e.amountType
+              events.push(e)
+            }
+          }
+        } catch(e) {
+          log(e)
+        }
+        events.push(a)
       }
+      transaction[tid] = events
     }
   }
 
+  let ixNotSupported = new IxDictionary()
+  for (let e of ixMoves) {
+        try {
+          if (e.action == 'move') {
+            if (ixNotSupported.has(e.fromExchange))
+              continue
 
-  let fileName = "events."+process.pid+".corrected.json"
+            let canMove = null
+            try {
+              let ten = spreads[e.amountType+"/USD"].meanAmountPerOneUSD * 10
+              canMove = await rl.safeMoveMoneyAsync(e.amountType, e.fromExchange, e.exchange, ten)
+            } catch(err) {
+              if (err.name == "withdraw") {
+                e.cantMove = err.name
+                ixNotSupported[e.fromExchange] = 1 
+              } else if (err.name == "address") {
+                e.cantMove = err.name
+              } else {
+                e.cantMove = err.name
+                e.message = err.message
+              }
+            }
+            log("cant move")
+          }
+        } catch(e) {
+          log(e)
+        }
+  }
+
+
+  for (let ti in transaction) {
+    let t = transaction[ti]
+    for (let i in t) {
+      let e = t[i]
+      if (e.action == "move") {
+
+        let cantMove = ixMoves[e.exchange+e.fromExchange+e.amountType].cantMove
+        if (cantMove) {
+          log("adding canot move "+cantMove)
+          e.cantMove = cantMove
+          transaction[ti][i] = e
+        }
+      }
+    }
+  }
+  let fileName = "events."+process.pid+".can.move.json"
   if (opt.write)
     fileName = opt.write
   log("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
   var eventFile= fs.createWriteStream(fileName, { flags: 'w' });
   eventFile.write(JSON.stringify(transaction, null, 4))
-
-/*
-  let count = 0
-  let  out = ""
-  let table = []
-var outFile= fs.createWriteStream('orderbook_summary.json', { flags: 'w' });
-  for (let exchange in orderBooks) {
-    for (let book of orderBooks[exchange]) {
-      let asks = book.sum(book.asks)
-      let bids = book.sum(book.bids)
-      let row = {exchange:exchange,symbol:book.symbol, 
-        total_asks:asks, count: book.asks.length, ap1:book.asks[0][0], av1:book.asks[0][1],
-        ap2:book.asks[1][0], av2:book.asks[1][1], ap3:book.asks[2][0], av3:book.asks[2][1],
-        total_bids:bids, count: book.bids.length, bp1:book.bids[0][0], bv1:book.bids[0][1],
-        bp2:book.bids[1][0], bv2:book.bids[1][1], bp3:book.bids[2][0], bv3:book.bids[2][1]
-      }
-
-      table.push(row)
-    }
-    console.log(exchange.cyan)
-    console.log(asTable(table))
-    outFile.write(asTableLog(table))
-  }
-*/
 
 })()

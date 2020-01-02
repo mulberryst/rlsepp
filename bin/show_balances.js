@@ -1,6 +1,6 @@
 'use strict';
 const config = require('config')
-  , RLSEPP = require('./librlsepp').Rlsepp
+  , RLSEPP = require('librlsepp').Rlsepp
   , verbose = process.argv.includes('--verbose')
   , debug = process.argv.includes('--debug')
   , fs = require("fs")
@@ -8,6 +8,7 @@ const config = require('config')
   , util = require('util')
   , ansicolor = require ('ansicolor').nice
   , asTable = require ('as-table').configure ({ title: x => x.bright, delimiter: ' | '.dim.cyan, dash: '-'.bright.cyan })
+  , log = require('ololog')
 ;
 
 var filename = path.basename(__filename);
@@ -33,7 +34,21 @@ Map.prototype.toJSON = function () {
 
 (async function main() {
   const rl = new RLSEPP();
-  await rl.initAsync(["livecoin","yobit"], {verbose, timeout:12500, retry: 5});
+  await rl.initStorable()
+
+  let exchanges = []
+  let cred = config.get("credentials")
+  for (let k in cred) {
+    try {
+      if (cred[k]["key"].length > 0)
+        exchanges.push(k)
+    } catch(e) {
+    }
+  }
+  await rl.initAsync(exchanges, {verbose, timeout:12500, retry: 5});
+
+  let spreads = rl.deriveSpreads( )
+
 //  console.json(rl.e);
 
 /*
@@ -44,8 +59,5 @@ Map.prototype.toJSON = function () {
   */
   console.log('Exchange Balances'.green)
   let balances = await rl.showBalances();
-  console.log('/*******************'. green)
-  console.log(' *  Derived Wallet'.green)
-  console.log(' *******************/'. green)
-  await rl.showDerivedWallet(balances, ['high','low','bid','ask']);
+//  log(JSON.stringify(balances))
 })()

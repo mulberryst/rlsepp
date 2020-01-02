@@ -25,8 +25,6 @@ var logStderr = process.stderr;
 var now = moment()
 var logFileS = fs.createWriteStream('/home/nathaniel/log/spread.log', { flags: 'w' }); 
 var logFileT = fs.createWriteStream('/home/nathaniel/log/tickers.log', { flags: 'w' }); 
-var logFile = fs.createWriteStream('/home/nathaniel/log/' + filename+'.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
-var logFile2 = fs.createWriteStream('/home/nathaniel/log/synopsis.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
 var logFile3 = fs.createWriteStream('/home/nathaniel/log/notice.log', { flags: 'w' }); 
 
 console.debug = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
@@ -37,6 +35,7 @@ console.log = function () {
 console.spread = function () { logFileS.write(util.format.apply(null, arguments) + '\n'); };
 console.tickers = function () { logFileT.write(util.format.apply(null, arguments) + '\n'); };
 console.paths = function () {
+  var logFile2 = fs.createWriteStream('/home/nathaniel/log/synopsis.'+now.format('YYYYMMDD.HHmm')+'.log', { flags: 'w' }); 
   logFile2.write(util.format.apply(null, arguments) + '\n');
 };
 console.fiveAndOver = function () {
@@ -88,8 +87,6 @@ const sortBy = (array, key, descending = false) => {
 
   let wt = rl.basis.clone()
   let spreads = rl.deriveSpreads( )
-
-  log (JSON.stringify(spreads,null,4))
 
 //Utilizing an N-ary tree data type for spreads to emulate the functionality of a 
 //  wallet might be the way to go for projections.
@@ -249,7 +246,7 @@ const sortBy = (array, key, descending = false) => {
 
   }
 //  rl.notify(message.join("\n"), 'synopsis');
-  console.log(message.join("\n"));
+//  console.log(message.join("\n"));
 
   let fileName = 'events.minmax.json'
   if (opt.write)

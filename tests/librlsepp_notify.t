@@ -10,6 +10,8 @@ var Rlsepp = require('../librlsepp').Rlsepp;
 const rl = Rlsepp.getInstance();
 
 (async function main() {
-  var sid = rl.notify("~<?///////>");
+  var sid = await rl.notify("~<?///////>", "test");
   console.log(sid);
+//  sid = await rl.notify("~<?///////>", {method:"text"});
+//  console.log(sid);
 })()
