@@ -1,4 +1,5 @@
-const fs = require('fs')
+const _ = require('lodash')
+  , fs = require('fs')
   , config = require('config')
   , pg = require('pg')
   , log4js = require('log4js')
