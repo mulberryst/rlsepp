@@ -353,6 +353,8 @@ function walletValueMeanUSD(wallet, spreads) {
     }
   } else {
     for (let node of treeRoot.all(function (node) { 
+      if (opt.to && node.model.action) 
+        return node.model.action.exchange == opt.to
       return  node.model.wallet.has('USD') && node.model.wallet.USD.value > 0
         && (node.model.wallet.USD.value > (wallet.USD.value - (wallet.USD.value * 0.05)))
         && (node.model.wallet.USD.value < (wallet.USD.value + (wallet.USD.value * 10)))
