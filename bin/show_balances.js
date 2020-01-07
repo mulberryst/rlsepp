@@ -36,15 +36,7 @@ Map.prototype.toJSON = function () {
   const rl = new RLSEPP();
   await rl.initStorable()
 
-  let exchanges = []
-  let cred = config.get("credentials")
-  for (let k in cred) {
-    try {
-      if (cred[k]["key"].length > 0)
-        exchanges.push(k)
-    } catch(e) {
-    }
-  }
+  let exchanges = rl.getExchangesWithAPIKeys()
   await rl.initAsync(exchanges, {verbose, timeout:12500, retry: 5});
 
   let spreads = rl.deriveSpreads( )
