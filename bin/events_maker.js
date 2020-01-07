@@ -1,5 +1,5 @@
 'use strict';
-process.env.NODE_ENV='public'
+//process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
   , fs = require("mz/fs")
@@ -50,6 +50,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   if (opt.buy) {
   }
   if (opt.move) {
+    log(opt.move)
   }
 
   let rl = Rlsepp.getInstance()
@@ -62,7 +63,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let spreads = rl.deriveSpreads( )
 
-  await rl.showBalances(spreads)
+  let balances = await rl.showBalances(spreads)
 
 //  balances.print()
 //      console.log(c+ "|" + rl.ccxt.currencyToPrecision(c, el.eAPI.total[c]))
@@ -75,16 +76,60 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
   */
 
-  if (opt.sell) {
-    let [exchange,currency] = opt.sell
-    let wallet = balances[exchange][currency]
-    wallet.symbol = currency+"/USD"
-//    rl.fetchOrderBooks(
-    console.log(JSON.stringify(amount))
-    let w = {}
-    w[currency]
-//    let w = 
-//    let ev = 
+  let transaction = null
+  if (opt.sell || opt.buy) {
+
+    let [exchange,currency] = []
+    if (opt.sell)
+      [exchange,currency] = opt.sell
+    if (opt.buy)
+      [exchange,currency] = opt.buy
+
+    let wallet = new IxDictionary()
+    wallet.set(currency, balances[exchange][currency])
+    let symbol = currency+"/USD"
+    //log(JSON.stringify(wallet))
+    let ticker = rl.getTickerByExchange(exchange,symbol)
+
+    let [action, w] = []
+    if (opt.sell)
+      [action, w] = rl.projectSell(wallet,exchange, ticker)
+    if (opt.buy)
+      [action, w] = rl.projectBuy(wallet,exchange, ticker)
+
+    let events = new IxDictionary()
+    events.set(exchange, new IxDictionary())
+    events[exchange][symbol] = action
+
+    let books = await rl.fetchOrderBooks(events, {store: false})
+
+    let transaction = rl.adjustActions([action])
+
+    log(JSON.stringify(transaction))
+
   }
+  if (opt.move) {
+    let [fromExchange, exchange, currency] = opt.move
+
+    let wallet = new IxDictionary()
+    wallet.set(currency, balances[fromExchange][currency])
+    let symbol = currency+"/USD"
+
+    let e = new Event({
+      action:"move",
+      exchange:exchange,
+      fromExchange:fromExchange,
+      amountType:currency,
+      amount:wallet[currency].value,
+      costType:currency,
+      cost:1,
+      tid:null
+    })
+    transaction = [e]
+  }
+
+  let fileName = "events_maker_"+process.pid+".json"
+  var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
+  eventFile.write(JSON.stringify(transaction, null, 4))
 
 })()

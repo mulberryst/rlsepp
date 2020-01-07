@@ -50,6 +50,6 @@ Map.prototype.toJSON = function () {
   console.log(printNice)
   */
   console.log('Exchange Balances'.green)
-  let balances = await rl.showBalances();
+  let balances = await rl.showBalances(spreads);
 //  log(JSON.stringify(balances))
 })()

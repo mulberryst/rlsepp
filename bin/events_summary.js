@@ -62,16 +62,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         let costBasis = jsonevents[tid][0].action.cost
         for (let aid in jsonevents[tid]) {
           let a = jsonevents[tid][aid]
-          if (lastExchange && a.exchange != lastExchange) {
-            if (a.action == 'buy')
-              if (!rl.canWithdraw(lastExchange, a.costType))
-                throw(new Error("cannot move "+a.costType+" from "+lastExchange))
-            if (a.action == 'sell')
-              if (!rl.canWithdraw(lastExchange, a.amountType))
-                throw(new Error("cannot move "+a.amountType+" from "+lastExchange))
-//              tweet = tweet + util.format("%s %s %s %d %s|", "move",lastExchange, a.costType, a.amount, a.exchange); 
-          }
-          lastExchange = a.exchange
+
+          if (a.action == 'move' && a.cantMove)
+            continue
 
           if (a.action == 'buy' || a.action == 'sell') {
             tweet = tweet + util.format("%s %s %s/%s %s %d", a.action, a.exchange, a.amountType, a.costType, a.priceType, a.price);
@@ -126,7 +119,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         await rl.notify(tweet.join("\n"),subject.join(","))
       }
     }
-    log(count + " transactions in file")
+    log(count + " transactions in file "+opt.file)
   }
 
 })()

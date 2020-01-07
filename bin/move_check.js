@@ -1,5 +1,4 @@
 'use strict';
-process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
   , fs = require("mz/fs")
@@ -121,11 +120,17 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
                 cost:1,
                 tid:null
               })
+
               ixMoves[e.exchange+e.fromExchange+e.amountType] = e
               ixWithdraw[e.fromExchange] = e.amountType
               ixDeposit[e.exchange] = e.amountType
               events.push(e)
             }
+          }
+          if (a.action == "move") {
+            ixMoves[a.exchange+a.fromExchange+a.amountType] = a
+            ixWithdraw[a.fromExchange] = a.amountType
+            ixDeposit[a.exchange] = a.amountType
           }
         } catch(e) {
           log(e)
@@ -140,32 +145,41 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   for (let e of ixMoves) {
         try {
           if (e.action == 'move') {
-            if (ixNotSupported.has(e.fromExchange))
+            if (ixNotSupported.has(e.fromExchange+e.amountType)) {
+              e.cantMove = "NotSupported"
+              e.message = "NotSupported"
               continue
+            }
 
             let canMove = null
             try {
               let ten = spreads[e.amountType+"/USD"].meanAmountPerOneUSD * 10
               canMove = await rl.safeMoveMoneyAsync(e.amountType, e.fromExchange, e.exchange, ten)
             } catch(err) {
+              log("cant move " + err)
               if (err.name == "withdraw") {
                 e.cantMove = err.name
-                ixNotSupported[e.fromExchange] = 1 
+                ixNotSupported[e.fromExchange+e.amountType] = 1 
+                e.message = err.message
               } else if (err.name == "address") {
                 e.cantMove = err.name
+                e.message = err.message
               } else {
                 e.cantMove = err.name
                 e.message = err.message
               }
+              log("cant move " + err)
             }
-            log("cant move")
           }
         } catch(e) {
           log(e)
         }
   }
 
+  log(JSON.stringify(ixMoves,null, 4))
 
+//01724058266001
+  //01724187266001
   for (let ti in transaction) {
     let t = transaction[ti]
     for (let i in t) {
@@ -173,9 +187,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       if (e.action == "move") {
 
         let cantMove = ixMoves[e.exchange+e.fromExchange+e.amountType].cantMove
+        let message = ixMoves[e.exchange+e.fromExchange+e.amountType].message
         if (cantMove) {
-          log("adding canot move "+cantMove)
+          log("adding canot move "+cantMove + " "+e.amountType)
           e.cantMove = cantMove
+          e.message = message
           transaction[ti][i] = e
         }
       }
