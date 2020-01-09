@@ -94,8 +94,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let ixWithdraw = new IxDictionary()
   let transaction = new IxDictionary()
 
-
-  //  add explicit move events, cache them for api verification
+  //  add explicit move events, cache them for api verificatevents.18187.can.move.jsonion
   //
   for (let fileno in jsonevents) {
     for (let tid in jsonevents[fileno]) {
@@ -121,14 +120,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
                 tid:null
               })
 
-              ixMoves[e.exchange+e.fromExchange+e.amountType] = e
+              ixMoves[e.exchange+e.fromExchange+e.amountType] = new Event(e)
               ixWithdraw[e.fromExchange] = e.amountType
               ixDeposit[e.exchange] = e.amountType
               events.push(e)
             }
           }
           if (a.action == "move") {
-            ixMoves[a.exchange+a.fromExchange+a.amountType] = a
+            ixMoves[a.exchange+a.fromExchange+a.amountType] = new Event(a)
             ixWithdraw[a.fromExchange] = a.amountType
             ixDeposit[a.exchange] = a.amountType
           }
@@ -142,12 +141,12 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
 
   let ixNotSupported = new IxDictionary()
-  for (let e of ixMoves) {
+  for (let i in ixMoves) {
+    let e = ixMoves[i]
         try {
           if (e.action == 'move') {
             if (ixNotSupported.has(e.fromExchange+e.amountType)) {
               e.cantMove = "NotSupported"
-              e.message = "NotSupported"
               continue
             }
 
@@ -156,23 +155,15 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
               let ten = spreads[e.amountType+"/USD"].meanAmountPerOneUSD * 10
               canMove = await rl.safeMoveMoneyAsync(e.amountType, e.fromExchange, e.exchange, ten)
             } catch(err) {
-              log("cant move " + err)
               if (err.name == "withdraw") {
-                e.cantMove = err.name
                 ixNotSupported[e.fromExchange+e.amountType] = 1 
-                e.message = err.message
-              } else if (err.name == "address") {
-                e.cantMove = err.name
-                e.message = err.message
-              } else {
-                e.cantMove = err.name
-                e.message = err.message
               }
-              log("cant move " + err)
+              e.cantMove = err
+              log("cant move " + err+"\n"+JSON.stringify(e))
             }
           }
-        } catch(e) {
-          log(e)
+        } catch(err) {
+          log(err)
         }
   }
 
@@ -187,11 +178,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       if (e.action == "move") {
 
         let cantMove = ixMoves[e.exchange+e.fromExchange+e.amountType].cantMove
-        let message = ixMoves[e.exchange+e.fromExchange+e.amountType].message
+//        let message = ixMoves[e.exchange+e.fromExchange+e.amountType].message
         if (cantMove) {
           log("adding canot move "+cantMove + " "+e.amountType)
           e.cantMove = cantMove
-          e.message = message
+//          e.message = message
           transaction[ti][i] = e
         }
       }
