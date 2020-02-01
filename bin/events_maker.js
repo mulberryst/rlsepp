@@ -40,8 +40,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     'file': {key: 'f', args: 1},
     'write': {key: 'w', args: 1},
     'sell': {args: 2},
-    'buy': {args: 2},
-    'move': {args: 3}
+    'buy': {args: 2, description: "exchange,currency,exchangeFrom,currencyFrom"},
+    'move': {args: 3, description: "fromExchange, exchange, currency"}
   })
 
   if (opt.sell) {
@@ -79,9 +79,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let transaction = null
   if (opt.sell || opt.buy) {
 
-    let [exchange,currency] = []
+    let [exchange,currency, exchangeFrom, currencyFrom] = []
+
     if (opt.sell)
       [exchange,currency] = opt.sell
+
     if (opt.buy)
       [exchange,currency] = opt.buy
 
@@ -103,7 +105,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     let books = await rl.fetchOrderBooks(events, {store: false})
 
-    let transaction = rl.adjustActions([action])
+    transaction = rl.adjustActions([action])
 
     log(JSON.stringify(transaction))
 
@@ -133,6 +135,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
 
   let fileName = "events.maker."+process.pid+".json"
+  if (opt.write)
+    fileName = opt.write
   var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
   eventFile.write(JSON.stringify(transaction, null, 4))
 

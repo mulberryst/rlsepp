@@ -181,7 +181,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //        let message = ixMoves[e.exchange+e.fromExchange+e.amountType].message
         if (cantMove) {
           log("adding canot move "+cantMove + " "+e.amountType)
-          e.cantMove = cantMove
+          e.cantMove = JSON.stringify(cantMove) + '|'+e.exchange+'|'+e.fromExchange+'|'+e.amountType
+          rl.store(e.cantMove, 'errors')
 //          e.message = message
           transaction[ti][i] = e
         }

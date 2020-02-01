@@ -37,8 +37,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let opt = stdio.getopt({
-    'file': {key: 'f', args: 1},
-    'write': {key: 'w', args: 1},
+    'file': {key: 'f', args: 1}
   })
 
   let rl = Rlsepp.getInstance()
@@ -82,6 +81,18 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         log(e)
       }
       log(r)
+    }
+    if (ev.action == 'sell') {
+    }
+    if (ev.action == 'buy') {
+    }
+
+    log(ev)
+    try {
+      const r = await rl.store(ev, 'transaction')
+      log(r)
+    } catch(err) {
+      log(err)
     }
   }
 
