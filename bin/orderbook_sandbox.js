@@ -1,4 +1,4 @@
-'use strict';
+  'use strict';
 process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
@@ -15,6 +15,7 @@ const config = require('config')
   , Tickers = require('librlsepp').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
+  , log4js = require('log4js')
 ;
 
 
@@ -37,16 +38,13 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     files = [opt.file]
   try {
     for (let file of files) {
-      log(file)
       const contents = await fs.readFile(file)
       let parsed = JSON.parse(contents)
       jsonevents.push(parsed)
     }
   } catch(e) {
-    console.log(e.message)
   };
 
-//  log(JSON.stringify(jsonevents, null, 4))
 //  throw ("asd")
 
 
@@ -57,7 +55,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   //  determine which exchanges to init
   //
   if (opt.tid && jsonevents[0][opt.tid]) {
-    log("TID mode")
   //  mainly for testings
     for (let event of jsonevents[0][opt.tid]) {
       event.symbol = event.amountType + "/" + event.costType
@@ -82,6 +79,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   const rl = Rlsepp.getInstance();
   await rl.initStorable()
   await rl.initAsync(exchanges, {enableRateLimit: true})
+
+  const logger = log4js.getLogger('file');
   
 
     //  apply exceptions before seeking order books
@@ -95,8 +94,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         try {
           let lastAction = null
           for (let event of jsonevents[fileno][tid]) {
-//            console.log(JSON.stringify(event))
-//            log(JSON.stringify(rl.exchangeExceptions,null, 4))
+
             rl.applyExceptions(event)
             if (lastAction != null) {
               if (lastAction.exchange != event.exchange) {
@@ -112,12 +110,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
           }
           events.merge(new Tickers(jsonevents[fileno][tid]))
         } catch(e) {
-          log(e.message)
           delete jsonevents[fileno][tid]
         }
       }
     }
-//  log(JSON.stringify(events, null, 4))
 
 
 //  let listAC = rl.arbitrableCommodities(['USDT'])
@@ -127,9 +123,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let cacheBookTree = new IxDictionary()
   let orderBooks = null
 
-  //log(events)
   let books = await rl.fetchOrderBooks(events, {store:false})
-//  log(books)
+  logger.info("num books in memory returned from API: "+books.size())
 
   let transaction = new IxDictionary()
   for (let fileno in jsonevents) {
@@ -144,7 +139,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         let thisTransaction = rl.adjustActions(jsonevents[fileno][tid])
         transaction[fileno + tid] = thisTransaction
       } catch(e) {
-        log(e)
       }
     }
   }
@@ -153,7 +147,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let fileName = "events."+process.pid+".corrected.json"
   if (opt.write)
     fileName = opt.write
-  log("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
+  logger("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
   var eventFile= fs.createWriteStream(fileName, { flags: 'w' });
   eventFile.write(JSON.stringify(transaction, null, 4))
 
@@ -175,8 +169,6 @@ var outFile= fs.createWriteStream('orderbook_summary.json', { flags: 'w' });
 
       table.push(row)
     }
-    console.log(exchange.cyan)
-    console.log(asTable(table))
     outFile.write(asTableLog(table))
   }
 */

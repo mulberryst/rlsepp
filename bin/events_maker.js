@@ -39,8 +39,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let opt = stdio.getopt({
     'file': {key: 'f', args: 1},
     'write': {key: 'w', args: 1},
-    'sell': {args: 2},
-    'buy': {args: 2, description: "exchange,currency,exchangeFrom,currencyFrom"},
+    'sell': {args: 2, description: "exchange,currency (USD)"},
+    'buy': {args: 2, description: "exchange,currency,currencyWith"},
     'move': {args: 3, description: "fromExchange, exchange, currency"}
   })
 
@@ -79,7 +79,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let transaction = null
   if (opt.sell || opt.buy) {
 
-    let [exchange,currency, exchangeFrom, currencyFrom] = []
+    let [exchange,currency, currencyWith] = []
 
     if (opt.sell)
       [exchange,currency] = opt.sell
@@ -91,6 +91,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     wallet.set(currency, balances[exchange][currency])
     let symbol = currency+"/USD"
     //log(JSON.stringify(wallet))
+    //
+
+//IMPLEMENT ME
+
     let ticker = rl.getTickerByExchange(exchange,symbol)
 
     let [action, w] = []
