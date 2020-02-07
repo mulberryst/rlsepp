@@ -147,7 +147,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let fileName = "events."+process.pid+".corrected.json"
   if (opt.write)
     fileName = opt.write
-  logger("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
+  logger.info("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
   var eventFile= fs.createWriteStream(fileName, { flags: 'w' });
   eventFile.write(JSON.stringify(transaction, null, 4))
 
