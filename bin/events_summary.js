@@ -37,7 +37,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     const contents = await fs.readFile(opt.file)
     jsonevents = JSON.parse(contents)
   } catch(e) {
-    console.log(e.message)
+    console.trace(e.message)
   };
 
 
@@ -45,9 +45,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   if (opt.tid) {
       for (let aid in jsonevents[opt.tid]) {
         let a = jsonevents[opt.tid][aid]
-          console.log(util.format("%s %s %s %s %d %d", opt.tid, a.action, a.exchange, a.amountType, a.price,a.amount))
+          console.trace(util.format("%s %s %s %s %d %d", opt.tid, a.action, a.exchange, a.amountType, a.price,a.amount))
         if (a.orders)
-          console.log(asTable(a.orders))
+          console.trace(asTable(a.orders))
       }
   } else {
     let out = []
@@ -91,7 +91,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       }
     }
     out.sort((a,b) => ((a[1] < b[1]) ? -1 : (a[1] > b[1]) ? 1 : 0))
-    out.map(el => console.log(el[0]))
+    out.map(el => console.trace(el[0]))
     if (opt.notify) {
       let tweet = []
       let subject = []
@@ -111,8 +111,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         })
       log(subject)
 
-//      console.log(JSON.stringify(table,null,4))
-//      console.log(asTable(table))
+//      console.trace(JSON.stringify(table,null,4))
+//      console.trace(asTable(table))
 //      let tweet = out.filter(el => el[1] > opt.notify).map(el => el[0])
       if (tweet.length > 0) {
         log("sending notification")

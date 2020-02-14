@@ -40,14 +40,16 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     'file': {key: 'f', args: 1},
     'write': {key: 'w', args: 1},
     'sell': {args: 2, description: "exchange,currency (USD)"},
-    'buy': {args: 2, description: "exchange,currency,currencyWith"},
+    'buy': {args: 3, description: "exchange,currency,currencyWith"},
     'move': {args: 3, description: "fromExchange, exchange, currency"}
   })
 
+  //
   if (opt.sell) {
     log(opt.sell)
   }
   if (opt.buy) {
+    log(opt.sell)
   }
   if (opt.move) {
     log(opt.move)
@@ -85,21 +87,34 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       [exchange,currency] = opt.sell
 
     if (opt.buy)
-      [exchange,currency] = opt.buy
+      [exchange, currency, currencyWith] = opt.buy
 
     let wallet = new IxDictionary()
-    wallet.set(currency, balances[exchange][currency])
+
+
+    log(JSON.stringify(balances))
+
+    try {
+      wallet.set(currency, balances[exchange][currency])
+    } catch(e) {
+      log("Missing DATA")
+    }
+
     let symbol = currency+"/USD"
-    //log(JSON.stringify(wallet))
-    //
 
 //IMPLEMENT ME
 
     let ticker = rl.getTickerByExchange(exchange,symbol)
 
+    log(wallet)
+    log(ticker)
+
     let [action, w] = []
     if (opt.sell)
       [action, w] = rl.projectSell(wallet,exchange, ticker)
+
+    //  ;;
+    //
     if (opt.buy)
       [action, w] = rl.projectBuy(wallet,exchange, ticker)
 
@@ -118,7 +133,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     let [fromExchange, exchange, currency] = opt.move
 
     let wallet = new IxDictionary()
-    wallet.set(currency, balances[fromExchange][currency])
+//    log(JSON.stringify(balances))
+    try {
+      wallet.set(currency, balances[fromExchange][currency])
+    } catch(e) {
+      log("Missing DATA")
+    }
+//    log(wallet)
+
     let symbol = currency+"/USD"
 
     let address = await rl.getDepositAddress(currency, exchange)

@@ -30,12 +30,9 @@ var now = moment()
 
 console.debug = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
 console.error = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
-console.log = function () {
-  logStdout.write(util.format.apply(null, arguments) + '\n');
-};
 console.info = function () { logStdout.write(util.format.apply(null, arguments) + '\n'); };
 
-console.log("Ensure that Crypto/Crypto quotes from exchanges are actually representing the quote currency!")
+log("Ensure that Crypto/Crypto quotes from exchanges are actually representing the quote currency!")
 
 /*
 Map.prototype.toJSON = function () {
@@ -203,7 +200,7 @@ function walletValueMeanUSD(wallet, spreads) {
       const contents = await fs.readFile(opt.file)
       jsonevents = JSON.parse(contents)
     } catch(e) {
-      console.log(e.message)
+      log(e.message)
     };
     let fromEv = new Events()
     let toEv = new Events()
@@ -275,7 +272,7 @@ function walletValueMeanUSD(wallet, spreads) {
             if (quote == 'USD' && name != entry.exchange)
               continue
             let leafNode=   rl.projectBuyTree(node.model.wallet.clone(), name, rl.getTickerByExchange(name,symbol), node)
-            //            console.log(name + " " + symbol + JSON.stringify(node.model.wallet))
+            //            log(name + " " + symbol + JSON.stringify(node.model.wallet))
             //            
             /*
             if (!leafNode.hasChildren() && leafNode.model.action) { //is a child, projectBuy happened
@@ -394,13 +391,13 @@ function walletValueMeanUSD(wallet, spreads) {
     let entry = walletValue(node.model.wallet)
     if (entry && entry.currency != 'USD')
       tweet += " actual "+entry.currency
-    console.log(node.model.id + " " + tweet)
+    log(node.model.id + " " + tweet)
     transaction[node.model.id] = events
 
   }
 
   if (wallet.has("USD"))
-    console.log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
+    log("original wallet value: "+wallet.USD.value +" -5%:"+(wallet.USD.value - (wallet.USD.value* 0.05) ))
 
   let fileName = "events.transfer."+process.pid+".json"
   if (opt.write)

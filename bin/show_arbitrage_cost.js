@@ -29,9 +29,6 @@ var logFile3 = fs.createWriteStream('/home/nathaniel/log/notice.log', { flags: '
 
 console.debug = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
 console.error = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
-console.log = function () {
-  logStdout.write(util.format.apply(null, arguments) + '\n');
-};
 console.spread = function () { logFileS.write(util.format.apply(null, arguments) + '\n'); };
 console.tickers = function () { logFileT.write(util.format.apply(null, arguments) + '\n'); };
 console.paths = function () {
@@ -43,7 +40,7 @@ console.fiveAndOver = function () {
 };
 console.info = function () { logStdout.write(util.format.apply(null, arguments) + '\n'); };
 
-console.log("Ensure that Crypto/Crypto quotes from exchanges are actually representing the quote currency!")
+log("Ensure that Crypto/Crypto quotes from exchanges are actually representing the quote currency!")
 
 var eventFile= fs.createWriteStream('events.minmax.json', { flags: 'w' }); 
 
@@ -83,7 +80,7 @@ const sortBy = (array, key, descending = false) => {
   let ledger = []
 //  for (let base of ['USD', 'BTC', 'LTC', 'ETH', 'ZEC', 'XRP',]) {
     let listAC = rl.arbitrableCommodities(['USDT'])
-//    console.log(listAC)
+//    log(listAC)
 
   let wt = rl.basis.clone()
   let spreads = rl.deriveSpreads( )
@@ -129,7 +126,7 @@ const sortBy = (array, key, descending = false) => {
   //  the amount of 1000 dollars in all base currencies
   //  at the moment tickers were fetched
   //
-//  console.log(rl.basis)
+//  log(rl.basis)
 
   let ledgerNode = ledgerRoot
   let actual = new IxDictionary(wallet)
@@ -246,7 +243,7 @@ const sortBy = (array, key, descending = false) => {
 
   }
 //  rl.notify(message.join("\n"), 'synopsis');
-//  console.log(message.join("\n"));
+//  log(message.join("\n"));
 
   let fileName = 'events.minmax.json'
   if (opt.write)
@@ -254,9 +251,9 @@ const sortBy = (array, key, descending = false) => {
   var eventFile= fs.createWriteStream(fileName, { flags: 'w' }); 
   eventFile.write(JSON.stringify(transaction, null, 4))
 
-  //ledgerNode.walk({strategy: 'breadth'}, node => console.log(node))
+  //ledgerNode.walk({strategy: 'breadth'}, node => log(node))
 
-   // console.log(util.inspect(ledgerNode,false, null, true))
+   // log(util.inspect(ledgerNode,false, null, true))
 
 
 /*
@@ -266,40 +263,40 @@ const sortBy = (array, key, descending = false) => {
     });
     var tree = ltt.GetTree();
 
-    console.log(util.inspect(tree,false, null, true))
+    log(util.inspect(tree,false, null, true))
     */
   /*
     for (let [sym, c] of wallet.entries()) {
-      console.log(c.ledger)
-      console.log(c.symbol, c.value)
+      log(c.ledger)
+      log(c.symbol, c.value)
     }
 */
 
   /*
     moves2 = rl.projectMoves(wallet, spreads)
     for (let spread of sortBy(moves2.filter(spread => spread.amount > 0), 'valueUSD', false)) {
-      console.log(spread.strip(['commodity','tickers']))
+      log(spread.strip(['commodity','tickers']))
  //     moves2 = rl.projectMoves(rl.basis,spreads)
     }
 
     for (let [sym, c] of wallet.entries()) {
-      console.log(c.ledger)
-      console.log(c.symbol, c.value)
+      log(c.ledger)
+      log(c.symbol, c.value)
     }
 */
 
   /*
     for (let spread of sortBy(moves2.filter(spread => spread.amount > 0), 'valueUSD', false)) {
-      console.log(spread.strip(['commodity','tickers']))
+      log(spread.strip(['commodity','tickers']))
     }
 */
-//  console.log(out.sort((a, b) => 
-//  console.log(asTableLog( spreads.asTable() ))
+//  log(out.sort((a, b) => 
+//  log(asTableLog( spreads.asTable() ))
 //  asTable.configure ({ print: x => (typeof x === 'boolean') ? (x ? 'yes' : 'no') : String (x) }) (data)
 
   /*
   for (let r of ixDict) {
-    console.log(r.name)
+    log(r.name)
     let tickerTable = r.tickers
     rl.showTickers(tickerTable)
   }
