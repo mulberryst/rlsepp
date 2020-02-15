@@ -18,6 +18,8 @@ const config = require('config')
   , Storable = require('librlsepp/js/lib/storable').Storable
   , sprintf = require('sprintf-js').sprintf
   , functions = require('librlsepp/js/lib/functions')
+  , WalletEntry = require('librlsepp/js/lib/wallet').WalletEntry
+  , Wallet = require('librlsepp/js/lib/wallet').Wallet
 ;
 
 const {
@@ -40,20 +42,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     'file': {key: 'f', args: 1},
     'write': {key: 'w', args: 1},
     'sell': {args: 2, description: "exchange,currency (USD)"},
-    'buy': {args: 3, description: "exchange,currency,currencyWith"},
+    'buy': {args: 2, description: "exchange,currency,currencyWith"},
+    'with': {args: 1, description: "fiat / crypto currency to purchase with (default: USD)"},
+    'for': {args: 1, description: "fiat / crypto currency to sell for (default: USD)"},
     'move': {args: 3, description: "fromExchange, exchange, currency"}
   })
-
-  //
-  if (opt.sell) {
-    log(opt.sell)
-  }
-  if (opt.buy) {
-    log(opt.sell)
-  }
-  if (opt.move) {
-    log(opt.move)
-  }
 
   let rl = Rlsepp.getInstance()
   await rl.initStorable()
@@ -67,6 +60,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let balances = await rl.showBalances(spreads)
 
+  balances.print()
 //  balances.print()
 //      console.log(c+ "|" + rl.ccxt.currencyToPrecision(c, el.eAPI.total[c]))
 
@@ -81,42 +75,49 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let transaction = null
   if (opt.sell || opt.buy) {
 
-    let [exchange,currency, currencyWith] = []
+    let [exchange,currency, currencyWith, currencyFor] = []
 
     if (opt.sell)
       [exchange,currency] = opt.sell
 
     if (opt.buy)
-      [exchange, currency, currencyWith] = opt.buy
+      [exchange, currency] = opt.buy
 
-    let wallet = new IxDictionary()
+    if (opt.with)
+      currencyWith = opt.with
+    if (opt.for)
+      currencyFor = opt.for
 
+//    let wallet = new IxDictionary()
+    let wallet = balances
 
-    log(JSON.stringify(balances))
-
+    /*
     try {
       wallet.set(currency, balances[exchange][currency])
     } catch(e) {
       log("Missing DATA")
     }
+    */
 
-    let symbol = currency+"/USD"
+    let symbol = currency+"/"
+    if (currencyWith) {
+      symbol += currencyWith
+    } else {
+      symbol += "USD"
+    }
 
-//IMPLEMENT ME
+//    log(wallet)
 
     let ticker = rl.getTickerByExchange(exchange,symbol)
 
-    log(wallet)
-    log(ticker)
+//    log(ticker)
 
     let [action, w] = []
     if (opt.sell)
-      [action, w] = rl.projectSell(wallet,exchange, ticker)
+      [action, w] = rl.projectSell(wallet, exchange, ticker)
 
-    //  ;;
-    //
     if (opt.buy)
-      [action, w] = rl.projectBuy(wallet,exchange, ticker)
+      [action, w] = rl.projectBuy(wallet, exchange, ticker)
 
     let events = new IxDictionary()
     events.set(exchange, new IxDictionary())
