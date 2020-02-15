@@ -133,8 +133,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   if (opt.move) {
     let [fromExchange, exchange, currency] = opt.move
 
-    let wallet = new IxDictionary()
-//    log(JSON.stringify(balances))
+    log(JSON.stringify(balances))
+
+    let wallet = new Wallet()
     try {
       wallet.set(currency, balances[fromExchange][currency])
     } catch(e) {
