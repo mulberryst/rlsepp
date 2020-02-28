@@ -42,10 +42,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     'file': {key: 'f', args: 1},
     'write': {key: 'w', args: 1},
     'sell': {args: 2, description: "exchange,currency (USD)"},
-    'buy': {args: 2, description: "exchange,currency,currencyWith"},
+    'buy': {args: 2, description: "exchange,currency"},
     'with': {args: 1, description: "fiat / crypto currency to purchase with (default: USD)"},
     'for': {args: 1, description: "fiat / crypto currency to sell for (default: USD)"},
-    'move': {args: 3, description: "fromExchange, exchange, currency"}
+    'move': {args: 3, description: "fromExchange, exchange, currency"},
+    'amount': {args: 1, description: "amount to move (if balances don't show currency)"}
   })
 
   let rl = Rlsepp.getInstance()
@@ -58,12 +59,12 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let spreads = rl.deriveSpreads( )
 
+  //log(spreads)
+
   let balances = await rl.showBalances(spreads)
 
-  balances.print()
 //  balances.print()
 //      console.log(c+ "|" + rl.ccxt.currencyToPrecision(c, el.eAPI.total[c]))
-
   /*
   for (let el of balances) {
     try {
@@ -91,14 +92,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //    let wallet = new IxDictionary()
     let wallet = balances
 
-    /*
-    try {
-      wallet.set(currency, balances[exchange][currency])
-    } catch(e) {
-      log("Missing DATA")
-    }
-    */
-
     let symbol = currency+"/"
     if (currencyWith) {
       symbol += currencyWith
@@ -106,11 +99,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       symbol += "USD"
     }
 
-//    log(wallet)
-
     let ticker = rl.getTickerByExchange(exchange,symbol)
-
-//    log(ticker)
 
     let [action, w] = []
     if (opt.sell)
@@ -128,20 +117,18 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     transaction = rl.adjustActions([action])
 
     log(JSON.stringify(transaction))
-
   }
+
   if (opt.move) {
     let [fromExchange, exchange, currency] = opt.move
 
-    log(JSON.stringify(balances))
+    let amount = 0
 
-    let wallet = new Wallet()
-    try {
-      wallet.set(currency, balances[fromExchange][currency])
-    } catch(e) {
-      log("Missing DATA")
-    }
-//    log(wallet)
+    let wallet = balances
+    if (wallet.has(currency, fromExchange))
+      amount = wallet[fromExchange][currency].value
+    else if (opt.amount > amount)
+      amount = opt.amount
 
     let symbol = currency+"/USD"
 
@@ -154,7 +141,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       address:address,
       fromExchange:fromExchange,
       amountType:currency,
-      amount:wallet[currency].value,
+      amount: amount,
       costType:currency,
       cost:1,
       tid:null
@@ -162,12 +149,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     transaction = [e]
   }
 
-  let fileName = "events.maker."+process.pid+".json"
-  if (opt.write)
-    fileName = opt.write
-  var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
-  eventFile.write(JSON.stringify(transaction, null, 4))
+  if (opt.sell || opt.buy || opt.move ) {
+    let fileName = "events.maker."+process.pid+".json"
+    if (opt.write)
+      fileName = opt.write
+    var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
+    eventFile.write(JSON.stringify(transaction, null, 4))
 
-  log("wrote file "+fileName)
+    log("wrote file "+fileName)
+  }
 
 })()
