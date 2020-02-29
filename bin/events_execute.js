@@ -13,8 +13,12 @@ const config = require('config')
   , asTableLog = require ('as-table').configure ({ title: x => x, delimiter: ' ', dash: '-' })
   , Rlsepp = require('librlsepp').Rlsepp
   , Event = require('librlsepp').Event
+  , Events = require('librlsepp/js/lib/event').Events
   , Tickers = require('librlsepp').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
+  , OrderBook = require('librlsepp/js/lib/orderbook').OrderBook
+  , Wallet = require('librlsepp/js/lib/wallet').Wallet
+  , WalletEntry = require('librlsepp/js/lib/wallet').WalletEntry
   , Storable = require('librlsepp/js/lib/storable').Storable
   , sprintf = require('sprintf-js').sprintf
   , functions = require('librlsepp/js/lib/functions')
@@ -71,8 +75,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     console.log(e.message)
   };
 
+  let events = new Events(jsonevents)
+
   let transaction = []
-  for (let ev of jsonevents) {
+  for (let ev of events) {
     if (ev.action == "move") {
       let r 
       try {
@@ -82,18 +88,38 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       }
       log(r)
     }
-    if (ev.action == 'sell') {
-    }
-    if (ev.action == 'buy') {
+
+    // gemini does limit orders only according to the child class
+    //
+    if (ev.action == 'sell' || ev.action == 'buy') {
+      let book = new OrderBook(ev)
+      log(book)
+      let rev = await rl.stickyOrder(ev, balances, book)
+      log(rev)
+
+      //  check blockchain?
+      //
+      //  poll order book ( timeout after  n * 2(c(1s) + 200ms + ratelimit)  )
+      //    pause by rate limit
+      //    match action.orders against orderbook
+      //    if none match, expect complete
+      //
+      //  tid = cancel order
+      //  
+      //  loop over balance
+      //    match on cancel (=), match on price (<> stddev), re-calculate price
+      //  record ev in transactions
+      //
     }
 
-    log(ev)
+    /*
     try {
-      const r = await rl.store(ev, 'transaction')
+      const r = await rl.store(rev, 'transaction')
       log(r)
     } catch(err) {
       log(err)
     }
+    */
   }
 
   let fileName = "events.execute."+process.pid+".json"

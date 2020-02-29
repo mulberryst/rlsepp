@@ -39,6 +39,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let opt = stdio.getopt({
+//    'force': {boolean: 1, description: "bypass safety checks for operations"},
     'file': {key: 'f', args: 1},
     'write': {key: 'w', args: 1},
     'sell': {args: 2, description: "exchange,currency (USD)"},
@@ -76,7 +77,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let transaction = null
   if (opt.sell || opt.buy) {
 
-    let [exchange,currency, currencyWith, currencyFor] = []
+    let [exchange,currency, currencyWith, currencyFor, amount] = []
 
     if (opt.sell)
       [exchange,currency] = opt.sell
@@ -92,6 +93,13 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //    let wallet = new IxDictionary()
     let wallet = balances
 
+    //  use opt.amount scrubbed against balance for sale amount
+    //
+    if (opt.amount > 0 && opt.sell) {
+      if ( wallet[exchange][currency].value > opt.amount)
+        wallet[exchange][currency].value = opt.amount
+    }
+
     let symbol = currency+"/"
     if (currencyWith) {
       symbol += currencyWith
@@ -102,8 +110,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     let ticker = rl.getTickerByExchange(exchange,symbol)
 
     let [action, w] = []
-    if (opt.sell)
+
+    if (opt.sell) {
       [action, w] = rl.projectSell(wallet, exchange, ticker)
+    }
 
     if (opt.buy)
       [action, w] = rl.projectBuy(wallet, exchange, ticker)
@@ -114,6 +124,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     let books = await rl.fetchOrderBooks(events, {store: false})
 
+    //  transaction is event(action) with orders, total matching amount 
+    //
     transaction = rl.adjustActions([action])
 
     log(JSON.stringify(transaction))
