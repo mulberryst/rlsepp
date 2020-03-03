@@ -41,14 +41,44 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let opt = stdio.getopt({
-    'file': {key: 'f', args: 1}
+    'file': {key: 'f', args: 1, default: "/dev/null", description:"filename containing json events"},
+    'eid': {key: 'e', args: 1, description:"event id as reported by events_maker"},
+    'dryrun': {args: 1, description:"peform a dry run of event"}
   })
 
   let rl = Rlsepp.getInstance()
   await rl.initStorable()
+
   let exchanges = rl.getExchangesWithAPIKeys()
   if (exchanges.length == 0)
     throw(new Error("no exchanges to initialize"))
+
+
+  let events
+  let book
+  if (opt.file != '/dev/null') {
+    let jsonevents = null
+    try {
+      const contents = await fs.readFile(opt.file)
+      jsonevents = JSON.parse(contents)
+    } catch(e) {
+      throw e
+    };
+
+    //
+    //
+    events = new Events(jsonevents)
+    exchanges = events.exchanges.keys()
+  } else if (opt.eid) {
+    try {
+      let Devent = await rl.retrieve({id:opt.eid}, 'event')
+      let event = new Event(Devent)
+      events = new Events([event ])
+      exchanges = events.exchanges.keys()
+    } catch(e) {
+      throw new Error(e)
+    }
+  }
 
   await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
 
@@ -67,18 +97,22 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
   */
 
-  let jsonevents = null
-  try {
-    const contents = await fs.readFile(opt.file)
-    jsonevents = JSON.parse(contents)
-  } catch(e) {
-    console.log(e.message)
-  };
-
-  let events = new Events(jsonevents)
 
   let transaction = []
   for (let ev of events) {
+
+    // timing of cli script from start to this point was roughly 18.3 s on wifi
+    //  init takes up a good portion of this time
+    //
+//    if (ev.age && ev.age > 20) {
+    if (ev.age && ev.age > 60) {
+      if (!opt.dryrun) {
+        log(ev)
+        log("skipping old event, regen? ")
+
+        continue
+      }
+    }
     if (ev.action == "move") {
       let r 
       try {
@@ -89,13 +123,35 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       log(r)
     }
 
+    let rev
     // gemini does limit orders only according to the child class
     //
     if (ev.action == 'sell' || ev.action == 'buy') {
-      let book = new OrderBook(ev)
-      log(book)
-      let rev = await rl.stickyOrder(ev, balances, book)
-      log(rev)
+      let book
+      try {
+        book = new OrderBook(ev)
+      } catch(e) {
+        try {
+          book = await rl.retrieve({id:ev.orderbookid}, 'orderbook')
+        } catch(er) {
+          throw new Error(er)
+        }
+      }
+
+      try {
+        if (opt.dryrun) {
+          log("DRY RUN")
+          rev = new Event(ev)
+        } else {
+          rev = await rl.stickyOrder(ev, balances, book)
+        }
+      } catch(e) {
+        rev = new Event(ev)
+        rev.success = 0
+        rev.info = {status:"failed", success:0, remaining: ev.amount, filled:0}
+      }
+
+      transaction.push(rev)
 
       //  check blockchain?
       //
@@ -112,19 +168,24 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       //
     }
 
-    /*
-    try {
-      const r = await rl.store(rev, 'transaction')
-      log(r)
-    } catch(err) {
-      log(err)
+    log(rev)
+    if (rev && rev.tid) {
+      try {
+        log("storing event transaction")
+        const r = await rl.store(rev, 'event')
+        log(r)
+      } catch(err) {
+        log(err)
+      }
     }
-    */
+
   }
 
-  let fileName = "events.execute."+process.pid+".json"
-  var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
-  eventFile.write(JSON.stringify(transaction, null, 4))
+  if (transaction.length > 0) {
+    let fileName = "events.execute."+process.pid+".json"
+    var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
+    eventFile.write(JSON.stringify(transaction, null, 4))
 
-  log("wrote file "+fileName)
+    log("wrote file "+fileName)
+  }
 })()

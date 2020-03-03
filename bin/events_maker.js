@@ -20,6 +20,7 @@ const config = require('config')
   , functions = require('librlsepp/js/lib/functions')
   , WalletEntry = require('librlsepp/js/lib/wallet').WalletEntry
   , Wallet = require('librlsepp/js/lib/wallet').Wallet
+  , OrderBook = require('librlsepp/js/lib/orderbook').OrderBook
 ;
 
 const {
@@ -47,8 +48,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     'with': {args: 1, description: "fiat / crypto currency to purchase with (default: USD)"},
     'for': {args: 1, description: "fiat / crypto currency to sell for (default: USD)"},
     'move': {args: 3, description: "fromExchange, exchange, currency"},
-    'amount': {args: 1, description: "amount to move (if balances don't show currency)"}
+    'amount': {args: 1, description: "amount to move (if balances don't show currency)"},
+    'cost': {args: 1, description: "amount of currency --with to spend on --buy"}
   })
+
+
 
   let rl = Rlsepp.getInstance()
   await rl.initStorable()
@@ -56,25 +60,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   if (exchanges.length == 0)
     throw(new Error("no exchanges to initialize"))
 
-  await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
-
-  let spreads = rl.deriveSpreads( )
-
-  //log(spreads)
-
-  let balances = await rl.showBalances(spreads)
-
-//  balances.print()
-//      console.log(c+ "|" + rl.ccxt.currencyToPrecision(c, el.eAPI.total[c]))
-  /*
-  for (let el of balances) {
-    try {
-    }
-    if (el.total >
-  }
-  */
-
-  let transaction = null
+  let transaction = []
   if (opt.sell || opt.buy) {
 
     let [exchange,currency, currencyWith, currencyFor, amount] = []
@@ -90,6 +76,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     if (opt.for)
       currencyFor = opt.for
 
+  await rl.initAsync([exchange], {enableRateLimit: true, timeout:12500, retry: 5});
+  let spreads = rl.deriveSpreads( )
+  let balances = await rl.showBalances(spreads)
+
 //    let wallet = new IxDictionary()
     let wallet = balances
 
@@ -100,11 +90,16 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         wallet[exchange][currency].value = opt.amount
     }
 
+
     let symbol = currency+"/"
     if (currencyWith) {
       symbol += currencyWith
+      if (opt.cost > 0)
+        wallet[exchange][currencyWith].value = opt.cost
     } else {
       symbol += "USD"
+      if (opt.cost > 0)
+        wallet[exchange]["USD"].value = opt.cost
     }
 
     let ticker = rl.getTickerByExchange(exchange,symbol)
@@ -129,12 +124,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     transaction = rl.adjustActions([action])
 
     log(JSON.stringify(transaction))
-  }
-
-  if (opt.move) {
+  } else if (opt.move) {
     let [fromExchange, exchange, currency] = opt.move
 
     let amount = 0
+
+  await rl.initAsync([fromExchange, exchange], {enableRateLimit: true, timeout:12500, retry: 5});
+  let spreads = rl.deriveSpreads( )
+  let balances = await rl.showBalances(spreads)
 
     let wallet = balances
     if (wallet.has(currency, fromExchange))
@@ -159,10 +156,41 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       tid:null
     })
     transaction = [e]
+  } else {
+    await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
+    let spreads = rl.deriveSpreads( )
+    let balances = await rl.showBalances(spreads)
+
   }
 
-  if (opt.sell || opt.buy || opt.move ) {
-    let fileName = "events.maker."+process.pid+".json"
+  let eid = process.pid
+
+  if (transaction.length > 0) {
+  try {
+    let ev = transaction[0]
+    ev.created_by = 'events_maker'
+
+    //  keep order book if one is embedded within
+    //
+    let oid = null
+    if (ev.orders) {
+      let book = new OrderBook(ev)
+      log('storing order book')
+      oid = await rl.store(book, 'orderbook')
+
+      delete ev.orders
+      ev.orderbookid = oid
+    }
+    log('storing event, book id: '+oid)
+    eid = await rl.store(ev, 'event')
+    log("eid: "+eid)
+  } catch(err) {
+    log(err)
+  }
+  }
+
+  if ((opt.sell || opt.buy || opt.move ) && opt.write) {
+    let fileName = "events.maker."+eid+".json"
     if (opt.write)
       fileName = opt.write
     var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
