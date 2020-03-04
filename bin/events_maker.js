@@ -32,7 +32,8 @@ const {
   sortBy,
   formatUSD,
   formatBTC,
-  formatCrypto
+  formatCrypto,
+  numberToString
 } = functions
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
@@ -41,21 +42,25 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let opt = stdio.getopt({
 //    'force': {boolean: 1, description: "bypass safety checks for operations"},
-    'file': {key: 'f', args: 1},
-    'write': {key: 'w', args: 1},
-    'sell': {args: 2, description: "exchange,currency (USD)"},
-    'buy': {args: 2, description: "exchange,currency"},
-    'with': {args: 1, description: "fiat / crypto currency to purchase with (default: USD)"},
-    'for': {args: 1, description: "fiat / crypto currency to sell for (default: USD)"},
-    'move': {args: 3, description: "fromExchange, exchange, currency"},
-    'amount': {args: 1, description: "amount to move (if balances don't show currency)"},
-    'cost': {args: 1, description: "amount of currency --with to spend on --buy"}
+    'file': {key: 'f', args: 1, 
+      description: "[file] input filename containing json flatfile containing an array of events"},
+    'write': {key: 'w', args: 1, description: "[file] also output json flatfile of individual event(action)"},
+    'sell': {args: 2, description: "[exchange,currency] (USD)"},
+    'buy': {args: 2, description: "[exchange,currency] --with [currency (default) USD]"},
+    'with': {args: 1, default: "USD", description: "fiat / crypto currency to purchase with (default: USD)"},
+    'for': {args: 1, default: "USD", 
+        description: "[USD|EUR|BTC|DOGECOIN|...] fiat / crypto currency to sell for (default: USD)"},
+    'move': {args: 3, description: "[fromExchange, exchange, currency]"},
+    'amount': {args: 1, description: "[n] amount to move (if balances don't show currency)"},
+    'cost': {args: 1, description: "[n] amount of currency --with to spend on --buy"},
+    'mock': {args: 1, default: 1,
+      description: "[1] mock (dry run) sell|buy|move operations performing safe guard checks, encapsulating entire transaction (by id or by --transaction #tag)"},
+    'transaction': {args: 1, descriptions: "transaction String #[tag]"}
   })
-
-
 
   let rl = Rlsepp.getInstance()
   await rl.initStorable()
+
   let exchanges = rl.getExchangesWithAPIKeys()
   if (exchanges.length == 0)
     throw(new Error("no exchanges to initialize"))
@@ -71,9 +76,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     if (opt.buy)
       [exchange, currency] = opt.buy
 
-    if (opt.with)
+    if (opt.with) // defaults: "USD"
       currencyWith = opt.with
-    if (opt.for)
+
+    if (opt.for) // defaults: "USD"
       currencyFor = opt.for
 
   await rl.initAsync([exchange], {enableRateLimit: true, timeout:12500, retry: 5});
@@ -85,27 +91,27 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     //  use opt.amount scrubbed against balance for sale amount
     //
-    if (opt.amount > 0 && opt.sell) {
-      if ( wallet[exchange][currency].value > opt.amount)
-        wallet[exchange][currency].value = opt.amount
-    }
-
+    if (opt.amount && opt.sell && opt.mock)
+      if (wallet.has(currency, exchange))
+        wallet[exchange][currency].value = numberToString(opt.amount)
+      else
+        wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.amount)}))
 
     let symbol = currency+"/"
-    if (currencyWith) {
-      symbol += currencyWith
-      if (opt.cost > 0)
-        wallet[exchange][currencyWith].value = opt.cost
-    } else {
-      symbol += "USD"
-      if (opt.cost > 0)
-        wallet[exchange]["USD"].value = opt.cost
-    }
+    symbol += currencyWith
+    if (opt.cost && opt.mock)
+      if (wallet.has(currency, exchange))
+        wallet[exchange][currencyWith].value = numberToString(opt.cost)
+      else
+        wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.cost)}))
 
+    //  tickers don't matter at all for prices
+    //    only that the symbol is offered (which is also a guess at this point
+    //
     let ticker = rl.getTickerByExchange(exchange,symbol)
 
-    let [action, w] = []
 
+    let [action, w] = []
     if (opt.sell) {
       [action, w] = rl.projectSell(wallet, exchange, ticker)
     }
@@ -117,29 +123,29 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     events.set(exchange, new IxDictionary())
     events[exchange][symbol] = action
 
-    let books = await rl.fetchOrderBooks(events, {store: false})
-
-    //  transaction is event(action) with orders, total matching amount 
+    //  TODO: when re-entrant, this disconnect on time/cache will be an issue
     //
+    let books = await rl.fetchOrderBooks(events, {store: false})
     transaction = rl.adjustActions([action])
+    if (opt.transaction)
+      transaction.map(e => {e.transaction_tag = opt.transaction})
 
     log(JSON.stringify(transaction))
+
   } else if (opt.move) {
     let [fromExchange, exchange, currency] = opt.move
 
-    let amount = 0
+    let amount = numberToString(0)
 
   await rl.initAsync([fromExchange, exchange], {enableRateLimit: true, timeout:12500, retry: 5});
   let spreads = rl.deriveSpreads( )
   let balances = await rl.showBalances(spreads)
 
     let wallet = balances
-    if (wallet.has(currency, fromExchange))
-      amount = wallet[fromExchange][currency].value
-    else if (opt.amount > amount)
-      amount = opt.amount
-
-    let symbol = currency+"/USD"
+    if (opt.mock && opt.amount)
+      amount = numberToString(opt.amount)
+    if (wallet.has(currency, fromExchange) && !opt.mock)
+      amount = numberToString(wallet[fromExchange][currency].value)
 
     let address = await rl.getDepositAddress(currency, exchange)
     log("address :" +address)
@@ -155,6 +161,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       cost:1,
       tid:null
     })
+
+    log(e)
+    if (opt.transaction)
+      e.transaction_tag = opt.transaction
     transaction = [e]
   } else {
     await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});

@@ -69,6 +69,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     //
     events = new Events(jsonevents)
     exchanges = events.exchanges.keys()
+
   } else if (opt.eid) {
     try {
       let Devent = await rl.retrieve({id:opt.eid}, 'event')
@@ -81,22 +82,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
 
   await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
-
   let spreads = rl.deriveSpreads( )
-
   let balances = await rl.showBalances(spreads)
-
-//  balances.print()
-//      console.log(c+ "|" + rl.ccxt.currencyToPrecision(c, el.eAPI.total[c]))
-
-  /*
-  for (let el of balances) {
-    try {
-    }
-    if (el.total >
-  }
-  */
-
 
   let transaction = []
   for (let ev of events) {
@@ -113,7 +100,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         continue
       }
     }
+
+    //
+    //
     if (ev.action == "move") {
+//    applyExceptions
+//      
+//      safeMoveMoneyAsync
+
       let r 
       try {
         r = await rl.moveMoneyAsync(ev.amountType, ev.fromExchange, ev.exchange, ev.amount)
@@ -152,7 +146,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       }
 
       transaction.push(rev)
-
       //  check blockchain?
       //
       //  poll order book ( timeout after  n * 2(c(1s) + 200ms + ratelimit)  )
