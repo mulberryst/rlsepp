@@ -14,16 +14,21 @@ const config = require('config')
   , Rlsepp = require('librlsepp').Rlsepp
   , Tickers = require('librlsepp').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
+  , OrderBook = require('librlsepp/js/lib/orderbook').OrderBook
+  , Event = require('librlsepp/js/lib/event').Event
+  , Events = require('librlsepp/js/lib/event').Events
   , Storable = require('librlsepp/js/lib/storable').Storable
   , sprintf = require('sprintf-js').sprintf
 ;
 
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
+console.trace = console.log
 
 ;(async function main() {
 
   let rl = Rlsepp.getInstance()
+  await rl.initStorable()
 
   let exchanges = []
   let opt = stdio.getopt({
@@ -33,93 +38,82 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   })
 
   let jsonevents = null
-  try {
-    const contents = await fs.readFile(opt.file)
-    jsonevents = JSON.parse(contents)
-  } catch(e) {
-    console.trace(e.message)
-  };
-
+  if (opt.file) {
+    try {
+      const contents = await fs.readFile(opt.file)
+      jsonevents = JSON.parse(contents)
+    } catch(e) {
+      console.trace(e.message)
+    };
+  }
 
   let dupCheck = new IxDictionary()
-  if (opt.tid) {
-      for (let aid in jsonevents[opt.tid]) {
-        let a = jsonevents[opt.tid][aid]
-          console.trace(util.format("%s %s %s %s %d %d", opt.tid, a.action, a.exchange, a.amountType, a.price,a.amount))
-        if (a.orders)
-          console.trace(asTable(a.orders))
-      }
-  } else {
-    let out = []
-    let count = 0
-    let table = []
-    for (let tid in jsonevents) {
-      count++
-      let tweet = ""
-      try {
-        let lastExchange = null
-        let rows = [[tid,"","","","amount","","","orders","cost"]]
-        let costBasis = jsonevents[tid][0].action.cost
-        for (let aid in jsonevents[tid]) {
-          let a = jsonevents[tid][aid]
+  let out = []
+  let count = 0
+  let table = []
+  //    for (let tid in jsonevents) \
+  let t = new Events(jsonevents)
 
-          if (a.action == 'move' && a.cantMove)
-            continue
+  log(t)
 
-          if (a.action == 'buy' || a.action == 'sell') {
-            tweet = tweet + util.format("%s %s %s/%s %s %d", a.action, a.exchange, a.amountType, a.costType, a.priceType, a.price);
-          } 
-          if (a.orders) {
-            rows.push(["", a.action, a.exchange, a.amountType + "/" + a.costType, a.amount,a.priceType, a.price, a.orders.length,a.cost])
-            tweet += " orders " + a.orders.length + "|"
-          } else 
-            tweet = tweet + "|"
+  let tids = t.keysByProfit()
+  tids.map( tag => t.print(tag) )
 
-          if (a.action == 'sell' && aid == (jsonevents[tid].length - 1)) {
-            tweet += sprintf("$%0.2f",a.cost)
-            if (!dupCheck.has(tweet)) {
-              dupCheck.set(tweet, 1)
-              //all sales
-              out.push([tid+ " " + tweet,a.cost])
-              if (opt.notify && a.cost >= opt.notify)
-                table.push(rows)
+  if (opt.notify) {
+
+    let tweet = []
+    let subject = []
+
+    tids = t.keysByProfit('desc')
+
+    let topN = tids.slice(0,5)
+
+    topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t.profit(tid) / t.costBasis(tid) * 1000))) ))
+
+    let top = tids.filter(tid => t.profit(tid) >= Number(opt.notify))
+    top.map( tid => tweet.push(t.asTweet(tid) ))
+    //        await rl.notify(tweet.join("\n"),subject.join(","))
+
+    if (tweet.length > 0 ) {
+      log("sending notification")
+      console.log(subject.join(""))
+      console.log(tweet.join("\n"))
+      await rl.notify(tweet.join("\n"),subject.join(","))
+    }
+
+    let promises = []
+    t.correct()
+    for (let tid of top) {
+      let evs = t[tid]
+
+      for (let aid in evs) {
+        let ev = evs[aid]
+          promises.push(new Promise(async (resolve, resject) => {
+            ev.created_by = 'events_pending'
+            ev.transaction_tag = tid
+
+            //  keep order book if one is embedded within
+            //
+            let oid = null
+            try {
+            if (ev.orders) {
+              let book = new OrderBook(ev)
+              oid = await rl.store(book, 'orderbook')
+
+              delete ev.orders
+              ev.orderbookid = oid
             }
-          }
-        }
-      } catch(e) {
-        log(e)
+            log('storing event, book id: '+oid)
+            let eid = await rl.store(ev, 'event')
+            resolve(eid)
+            } catch(e) {
+              log(e)
+              resolve(null)
+            }
+          }))
+        await Promise.all(promises).then( ).catch(error => log(error))
       }
     }
-    out.sort((a,b) => ((a[1] < b[1]) ? -1 : (a[1] > b[1]) ? 1 : 0))
-    out.map(el => console.trace(el[0]))
-    if (opt.notify) {
-      let tweet = []
-      let subject = []
-      let topN = 5
-      table.sort((a,b) => ((a[a.length-1][8] < b[b.length-1][8]) ? 1 : (a[a.length-1][8] > b[b.length-1][8]) ? -1 : 0))
-        .map(el => {
-          tweet.push(asTableLog(el)+"\n")
-          let costBasis = el[1][8]
-          let finalAct = el[el.length-1]
-//          log(costBasis + " " + finalAct)
-          if (finalAct[1] == 'sell' && topN > 0) {
-            topN -= 1
-            let profitBasis = ((finalAct[8] - costBasis)/costBasis)*1000
-            subject.push(sprintf("%0.0f ",Math.round(profitBasis)))
-//            subject += profitPercent
-          }
-        })
-      log(subject)
-
-//      console.trace(JSON.stringify(table,null,4))
-//      console.trace(asTable(table))
-//      let tweet = out.filter(el => el[1] > opt.notify).map(el => el[0])
-      if (tweet.length > 0) {
-        log("sending notification")
-        await rl.notify(tweet.join("\n"),subject.join(","))
-      }
-    }
-    log(count + " transactions in file "+opt.file)
   }
 
 })()

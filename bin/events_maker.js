@@ -41,7 +41,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let opt = stdio.getopt({
-//    'force': {boolean: 1, description: "bypass safety checks for operations"},
     'file': {key: 'f', args: 1, 
       description: "[file] input filename containing json flatfile containing an array of events"},
     'write': {key: 'w', args: 1, description: "[file] also output json flatfile of individual event(action)"},
@@ -53,8 +52,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     'move': {args: 3, description: "[fromExchange, exchange, currency]"},
     'amount': {args: 1, description: "[n] amount to move (if balances don't show currency)"},
     'cost': {args: 1, description: "[n] amount of currency --with to spend on --buy"},
-    'mock': {args: 1, default: 1,
-      description: "[1] mock (dry run) sell|buy|move operations performing safe guard checks, encapsulating entire transaction (by id or by --transaction #tag)"},
+    'mock': {args: 1, default: null,
+      description: "[null] mock (dry run) sell|buy|move operations performing safe guard checks, encapsulating entire transaction (by id or by --transaction #tag)"},
     'transaction': {args: 1, descriptions: "transaction String #[tag]"}
   })
 
@@ -89,22 +88,35 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //    let wallet = new IxDictionary()
     let wallet = balances
 
+    // wallet override amount in projectSell,projectBuy
+    let Pamount = null
+    let symbol = currency+"/"+currencyFor
+
     //  use opt.amount scrubbed against balance for sale amount
     //
-    if (opt.amount && opt.sell && opt.mock)
-      if (wallet.has(currency, exchange))
-        wallet[exchange][currency].value = numberToString(opt.amount)
-      else
-        wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.amount)}))
+    if (opt.sell && (opt.mock != null)) {
+      if (opt.amount) {     
+        if (wallet.has(currency, exchange))
+          wallet[exchange][currency].value = numberToString(opt.amount)
+        else {
+          log("or not")
+          wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.amount)}))
+        }
+      } else
+        Pamount = rl.marketsMinimumLimit(symbol, exchange)
+    } 
+    log(wallet)
 
-    let symbol = currency+"/"
-    symbol += currencyWith
-    if (opt.cost && opt.mock)
-      if (wallet.has(currency, exchange))
-        wallet[exchange][currencyWith].value = numberToString(opt.cost)
-      else
-        wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.cost)}))
-
+    symbol = currency+"/"+currencyWith
+    if ((opt.mock != null) && opt.buy) {
+      if (opt.cost) {
+        if (wallet.has(currencyWith, exchange))
+          wallet[exchange][currencyWith].value = numberToString(opt.cost)
+        else
+          wallet.add(new WalletEntry({currency:currencyWith, exchange:exchange, value: numberToString(opt.cost)}))
+      } else
+        Pamount = rl.marketsMinimumLimit(symbol, exchange)
+    }
     //  tickers don't matter at all for prices
     //    only that the symbol is offered (which is also a guess at this point
     //
@@ -113,11 +125,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     let [action, w] = []
     if (opt.sell) {
-      [action, w] = rl.projectSell(wallet, exchange, ticker)
+      [action, w] = rl.projectSell(wallet, exchange, ticker,Pamount)
     }
 
     if (opt.buy)
-      [action, w] = rl.projectBuy(wallet, exchange, ticker)
+      [action, w] = rl.projectBuy(wallet, exchange, ticker, Pamount)
 
     let events = new IxDictionary()
     events.set(exchange, new IxDictionary())
@@ -142,9 +154,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let balances = await rl.showBalances(spreads)
 
     let wallet = balances
-    if (opt.mock && opt.amount)
+    if ((opt.mock != null) && opt.amount)
       amount = numberToString(opt.amount)
-    if (wallet.has(currency, fromExchange) && !opt.mock)
+    if (wallet.has(currency, fromExchange) && (opt.mock == null))
       amount = numberToString(wallet[fromExchange][currency].value)
 
     let address = await rl.getDepositAddress(currency, exchange)
@@ -159,9 +171,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       amount: amount,
       costType:currency,
       cost:1,
+      transaction_tag:opt.transaction,
       tid:null
     })
 
+    log(JSON.stringify(rl.marketsMinimumLimit(currency+"/"+opt.with, fromExchange)))
     log(e)
     if (opt.transaction)
       e.transaction_tag = opt.transaction

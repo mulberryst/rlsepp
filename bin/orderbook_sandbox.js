@@ -1,4 +1,4 @@
-  'use strict';
+'use strict';
 process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
@@ -24,14 +24,21 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let exchanges = []
+  let cache = {}
+  let ex = {}
+  let events = [] //make generic TODO
+  let jsonevents = []
+  let files = null
+  let cacheBookTree = new IxDictionary()
+  let orderBooks = null
+
+
   let opt = stdio.getopt({
     'file': {key: 'f', mandatory:true, multiple: true},
     'write': {key: 'w', args: 1},
     'tid': {key: 't', args: 1}
   })
 
-  let jsonevents = []
-  let files = null
   if (opt.file.constructor == Array)
     files = opt.file
   else
@@ -44,13 +51,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     }
   } catch(e) {
   };
-
-//  throw ("asd")
-
-
-  let cache = {}
-  let ex = {}
-  let events = [] //make generic TODO
 
   //  determine which exchanges to init
   //
@@ -83,54 +83,51 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   const logger = log4js.getLogger('file');
   
 
-    //  apply exceptions before seeking order books
-    //
-    events = new Tickers()
-    for (let fileno in jsonevents) {
-      for (let tid in jsonevents[fileno]) {
-        if (opt.tid && tid != opt.tid)
-          continue 
+  //  apply exceptions before seeking order books
+  //
+  events = new Tickers()
+  for (let fileno in jsonevents) {
+    for (let tid in jsonevents[fileno]) {
+      if (opt.tid && tid != opt.tid)
+        continue 
 
-        try {
-          let lastAction = null
-          for (let event of jsonevents[fileno][tid]) {
+      try {
+        let lastAction = null
+        for (let event of jsonevents[fileno][tid]) {
 
-            rl.applyExceptions(event)
-            if (lastAction != null) {
-              if (lastAction.exchange != event.exchange) {
-                if (event.event == 'buy')
-                  if (!rl.canWithdraw(lastAction.exchange, event.costType))
-                    throw(new Error("cannot move "+event.costType+" from "+lastAction.exchange))
-                if (event.event == 'sell')
-                  if (!rl.canWithdraw(lastAction.exchange, event.amountType))
-                    throw(new Error("cannot move "+event.amountType+" from "+lastAction.exchange))
-              }
+          rl.applyExceptions(event)
+          if (lastAction != null) {
+            if (lastAction.exchange != event.exchange) {
+              if (event.event == 'buy')
+                if (!rl.canWithdraw(lastAction.exchange, event.costType))
+                  throw(new Error("cannot move "+event.costType+" from "+lastAction.exchange))
+              if (event.event == 'sell')
+                if (!rl.canWithdraw(lastAction.exchange, event.amountType))
+                  throw(new Error("cannot move "+event.amountType+" from "+lastAction.exchange))
             }
-            lastAction = event
           }
-          events.merge(new Tickers(jsonevents[fileno][tid]))
-        } catch(e) {
-          delete jsonevents[fileno][tid]
+          lastAction = event
         }
+        events.merge(new Tickers(jsonevents[fileno][tid]))
+      } catch(e) {
+        delete jsonevents[fileno][tid]
       }
     }
+  }
 
 
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
 
 
-  let cacheBookTree = new IxDictionary()
-  let orderBooks = null
-
   let books = await rl.fetchOrderBooks(events, {store:false})
+//  logger.info(util.inspect(books,true,true))
   logger.info("num books in memory returned from API: "+books.size())
 
   let transaction = new IxDictionary()
   for (let fileno in jsonevents) {
     for (let tid in jsonevents[fileno]) {
       let lastAmount = null
-
 
       if (opt.tid && opt.tid != tid)
         continue
