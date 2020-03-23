@@ -33,7 +33,8 @@ const {
   sortBy,
   formatUSD,
   formatBTC,
-  formatCrypto
+  formatCrypto,
+  numberToString
 } = functions
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
@@ -43,7 +44,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let opt = stdio.getopt({
     'file': {key: 'f', args: 1, default: "/dev/null", description:"filename containing json events"},
     'eid': {key: 'e', args: 1, description:"event id as reported by events_maker"},
-    'dryrun': {args: 1, description:"peform a dry run of event"}
+    'dryrun': {args: 1, description:"peform a dry run of event"},
+    'transaction': {args: 1, description:"execute series of events marked by transaction tag"}
   })
 
   let rl = Rlsepp.getInstance()
@@ -68,112 +70,168 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     //
     //
     events = new Events(jsonevents)
-    exchanges = events.exchanges.keys()
+    exchanges = events.exchanges()
 
   } else if (opt.eid) {
     try {
       let Devent = await rl.retrieve({id:opt.eid}, 'event')
       let event = new Event(Devent)
-      events = new Events([event ])
+      events = new Events([event])
       exchanges = events.exchanges.keys()
+      events = events[0]
     } catch(e) {
       throw new Error(e)
     }
+  } else if (opt.transaction) {
+    //TODO: put into events_test.js
+    try {
+      events = await rl.retrieve({transaction_tag: opt.transaction}, 'transaction')
+    } catch(e) {
+      throw new Error(e)
+    }
+
+    exchanges = events.exchanges()
   }
+
 
   await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
   let spreads = rl.deriveSpreads( )
   let balances = await rl.showBalances(spreads)
 
-  let transaction = []
-  for (let ev of events) {
+  log(events)
+  //  let transaction = []
+  for (let eid in events) {
+    let ev = events[eid]
+    for (let eeiT of ev) {
 
-    // timing of cli script from start to this point was roughly 18.3 s on wifi
-    //  init takes up a good portion of this time
-    //
-//    if (ev.age && ev.age > 20) {
-    if (ev.age && ev.age > 60) {
-      if (!opt.dryrun) {
-        log(ev)
-        log("skipping old event, regen? ")
+      // timing of cli script from start to this point was roughly 18.3 s on wifi
+      //  init takes up a good portion of this time
+      //
+      //    if (ev.age && ev.age > 20)
+      if (eeiT.age && eeiT.age > 1000000) {
+        if (!opt.dryrun) {
+          log(eeiT)
+          log("skipping old event, regen? ")
 
-        continue
+          continue
+        }
       }
-    }
 
-    //
-    //
-    if (ev.action == "move") {
-//    applyExceptions
-//      
-//      safeMoveMoneyAsync
+      log("here")
+      //
+      //
+      if (eeiT.action == 'move') {
+        log("here")
+        //    applyExceptions
+        //      
+        //      safeMoveMoneyAsync
 
-      let r 
-      try {
-        r = await rl.moveMoneyAsync(ev.amountType, ev.fromExchange, ev.exchange, ev.amount)
-      } catch(e) {
-        log(e)
-      }
-      log(r)
-    }
-
-    let rev
-    // gemini does limit orders only according to the child class
-    //
-    if (ev.action == 'sell' || ev.action == 'buy') {
-      let book
-      try {
-        book = new OrderBook(ev)
-      } catch(e) {
+        let r 
         try {
-          book = await rl.retrieve({id:ev.orderbookid}, 'orderbook')
-        } catch(er) {
-          throw new Error(er)
+          r = await rl.moveMoneyAsync(
+            eeiT.amountType, eeiT.fromExchange, eeiT.exchange, eeiT.amount
+          )
+          log("was the call made?")
+          log(r)
+
+          let done = false
+          let stime = 1000
+          do {
+            await sleep(stime)
+            let verify = await rl.fetchBalances();
+            let search = verify.has(eeiT.amountType, eeiT.exchange)
+            log(search)
+            if (numberToString(search[eeiT.amountType].value) == numberToString(eeiT.amount))
+              done = true
+            else
+              stime = 5000
+          } while (!done)
+        } catch(e) {
+          log(e)
         }
-      }
 
-      try {
-        if (opt.dryrun) {
-          log("DRY RUN")
-          rev = new Event(ev)
-        } else {
-          rev = await rl.stickyOrder(ev, balances, book)
-        }
-      } catch(e) {
-        rev = new Event(ev)
-        rev.success = 0
-        rev.info = {status:"failed", success:0, remaining: ev.amount, filled:0}
-      }
-
-      transaction.push(rev)
-      //  check blockchain?
-      //
-      //  poll order book ( timeout after  n * 2(c(1s) + 200ms + ratelimit)  )
-      //    pause by rate limit
-      //    match action.orders against orderbook
-      //    if none match, expect complete
-      //
-      //  tid = cancel order
-      //  
-      //  loop over balance
-      //    match on cancel (=), match on price (<> stddev), re-calculate price
-      //  record ev in transactions
-      //
-    }
-
-    log(rev)
-    if (rev && rev.tid) {
-      try {
-        log("storing event transaction")
-        const r = await rl.store(rev, 'event')
+        //TODO: store, tid?
         log(r)
-      } catch(err) {
-        log(err)
       }
-    }
 
-  }
+      let rev
+      // gemini does limit orders only according to the child class
+      //
+      if (eeiT.action == 'sell' || eeiT.action == 'buy') {
+        let book
+        try {
+          book = new OrderBook(eeiT)
+        } catch(e) {
+          try {
+            book = await rl.retrieve({id:eeiT.orderbookid}, 'orderbook')
+          } catch(er) {
+            throw new Error(er)
+          }
+        }
 
+        try {
+          if (opt.dryrun) {
+            log("DRY RUN")
+            rev = new Event(eeiT)
+          } else {
+            rev = await rl.stickyOrder(eeiT, balances, book)
+            let done = false
+            let stime = 1000
+            do {
+              await sleep(stime)
+              let verify = await rl.fetchBalances([eeiT.exchange]);
+              let field
+              let value
+              if (eeiT.action == "buy")
+                [field, value] = [eeiT.amountType, eeiT.amount]
+              if (eeiT.action == "sell")
+                [field, value] = [eeiT.costType, eeiT.cost]
+
+              let orig = balances.has(field, eeiT.exchange)
+              let search = verify.has(field, eeiT.exchange)
+              log(orig)
+              log(search)
+              if (parseFloat(numberToString(search[field].value)) >= (parseFloat(orig[field].value) + parseFloat(numberToString(eeiT.amount))))
+                done = true
+              else
+                stime = 1250
+            } while (!done)
+          }
+        } catch(e) {
+          rev = new Event(eeiT)
+          rev.success = 0
+          rev.info = {status:"failed", success:0, remaining: eeiT.amount, filled:0}
+        }
+
+        log(rev)
+        if (rev && rev.tid) {
+          try {
+            log("storing event transaction")
+            const r = await rl.store(rev, 'event')
+            log(r)
+          } catch(err) {
+            log(err)
+          }
+        }
+        //      transaction.push(rev)
+        //  check blockchain?
+        //
+        //  poll order book ( timeout after  n * 2(c(1s) + 200ms + ratelimit)  )
+        //    pause by rate limit
+        //    match action.orders against orderbook
+        //    if none match, expect complete
+        //
+        //  tid = cancel order
+        //  
+        //  loop over balance
+        //    match on cancel (=), match on price (<> stddev), re-calculate price
+        //  record ev in transactions
+        //
+      }
+    }// for
+  }//for
+
+    /*
   if (transaction.length > 0) {
     let fileName = "events.execute."+process.pid+".json"
     var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
@@ -181,4 +239,5 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     log("wrote file "+fileName)
   }
+  */
 })()

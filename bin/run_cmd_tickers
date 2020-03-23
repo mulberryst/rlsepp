@@ -1,0 +1,14 @@
+#!/bin/sh
+
+
+CMD=$1
+shift
+
+PARAMS="$PARAMS $1"
+shift
+
+WD=/home/nathaniel/src/noscm/rlsepp
+cd $WD
+#export NODE_ENV=
+env NODE_PATH="$WD" /usr/bin/node bin/$CMD $PARAMS 2>&1 > /dev/null
+
