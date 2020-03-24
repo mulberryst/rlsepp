@@ -88,6 +88,10 @@ let eobj = {currency:"USD", value: 1000}
 if (opt.from)
   eobj.exchange = opt.from
 
+let endsOn = []
+if (opt.to)
+  endsOn.push(opt.to)
+
 let wallet = new Wallet(new WalletEntry(eobj))
 let originalCoefficient = 1 / wallet[opt.from]['USD'].value
 
@@ -130,6 +134,7 @@ let we = wallet.valueFirst()
 
   let spreads = rl.deriveSpreads()
 
+  let transactions = null
   //  log(walletValueMeanUSD(wallet, spreads))
   //
   //  initial buy
@@ -169,9 +174,6 @@ let we = wallet.valueFirst()
     }
   } else if (opt.file) {
 
-
-    /*  used to set from and to */
-
     let jsonevents = null
     try {
       const contents = await fs.readFile(opt.file)
@@ -180,52 +182,25 @@ let we = wallet.valueFirst()
       log(e.message)
     };
 
-//    let fromEv = new Events()
-//    fromEv[Symbol.iterator] = fromEv.__private__.iterator.fromTo()
+    transactions = new Events(jsonevents)
+    transactions.trimLoss(7)
 
+    log(transactions.count())
 
-    let fromTo = []
-    for (let tid in jsonevents) {
-      let transaction = jsonevents[tid]
-      try {
-        let first = transaction.shift()
-        let last = transaction.pop()
-        if (rl.dictExchange[first.exchange] && rl.dictExchange[last.exchange]) {
-          fromTo.push([first,last])
-        }
-      } catch(e) {
-        log(e)
+    for (let t of transactions.keys()) {
+      transactions.print(t)
+
+      let ev = transactions.last(t)
+      let exchange = ev.exchange
+
+      for (let symbol of rl.exchangeMarketsHavingQuote(exchange, 'USD')) {
+        let ticker = rl.getTickerByExchange(exchange,symbol)
+        let wallet = walletFromEvent(ev)
+        let leaf = rl.projectBuyTree(wallet, exchange, ticker, treeNode)
       }
     }
-
-    //
-    //
-    for (let [from,to] of fromTo) {
-      let currency = null
-      let amount = 0
-      try {
-        let w = walletFromEvent(from)
-
-        let currency = w.currencyFirst()
-        if (rl.canWithdraw(from.exchange, currency)) {
-          for (let e of rl.getCurrentTickerExchanges()) {
-            if (e != from.exchange) {
-              for (let symbol of rl.exchangeMarketsHavingQuote(e, currency)) {
-                let ticker = rl.getTickerByExchange(e,symbol)
-                let leafNode = rl.projectBuyTree(w.clone(), e, ticker, treeNode, to)
-              }
-            }
-          }
-        } else {
-          for (let symbol of rl.exchangeMarketsHavingQuote(from.exchange, currency)) {
-            let ticker = rl.getTickerByExchange(from.exchange,symbol)
-            let leafNode = rl.projectBuyTree(w.clone(), from.exchange, ticker, treeNode, to)
-          }
-        }
-      } catch(e) {
-        throw e
-        //  log("bad wallet from: "+ev)
-      }
+    for (let exchange of transactions.exchangeBeginsOn()) {
+      endsOn.push(exchange)
     }
   } else {
 
@@ -243,12 +218,11 @@ let we = wallet.valueFirst()
     }
   }
 
-
   //////////
   //
   //
   let nodeCount = 0
-  for (let i = 0; i<=1 ;i++) {
+  for (let i = 0; i<1 ;i++) {
     //          let [base, quote] = symbol.split('/')
     // for each resulting currrency crypto on from exchange
     level *= 1000
@@ -256,18 +230,32 @@ let we = wallet.valueFirst()
 
     for (let node of treeRoot.all(function (node) { return node.model.id >= level })) {
       let currency = node.model.wallet.currencyFirst()
+      let value = node.model.wallet.valueOf(currency)
+
+      for (let name of endsOn) {
+
+        let leaf = rl.projectTransferTree(node.model.wallet.clone(), name, currency, node)
+      }
+
       //of all,
       for (let name of rl.dictExchange.keys()) {
         //repeat buy
         if ( node.model.action.action == 'buy' && node.model.action.exchange == name)
           continue
 
+        let w = new Wallet(new WalletEntry({currency:currency, value:value, exchange: name}))
+
+        let symbol = currency+"/USD"
+        let leafNode = rl.projectSellTree(w, name, rl.getTickerByExchange(name,symbol), node)
+
+
         for (let symbol of rl.exchangeMarketsHavingQuote(name, currency)) {
 
           if (typeof rl.getTickerByExchange(name,symbol) !== 'undefined') {
 
-            let leafNode = rl.projectBuyTree(node.model.wallet.clone(), name, rl.getTickerByExchange(name,symbol), node)
-                        log(name + " " + symbol + JSON.stringify(node.model.wallet))
+            w = new Wallet(new WalletEntry({currency:currency, value:value, exchange: name}))
+
+            let leafNode = rl.projectBuyTree(w, name, rl.getTickerByExchange(name,symbol), node)
             /*
             if (!leafNode.hasChildren() && leafNode.model.action) { //is a child, projectBuy happened
               let value = 0
@@ -290,38 +278,52 @@ let we = wallet.valueFirst()
     }
   }
 
-  level *= 1000
-  log("makes it to level "+level)
-  let transaction = new IxDictionary()
+  /*
+  for (let node of treeRoot.all(function (node) { 
+    return node.model.id >= level 
+  })) {
+    let path = node.getPath()
+    let eobj = []
+    for (let e of path) {
+      if (e.model.action)
+        eobj.push(e.model.action)
+    }
+    log(eobj)
+    let transaction = new Events(eobj)
+    if (transaction.exchangeEndsOn(opt.to))
+      transaction.print()
+  }
+  */
 
-  let final = []
-  for (let node of treeRoot.all(function (node) { return node })) {
+ log(endsOn) 
+
+
+  let final = {}
+  for (let node of treeRoot.all(function (node) { 
+    return node.model.id >= level 
+  })) {
     if (node.model.action) {
-      log("****")
-      log(node.model.to)
-
-      if (node.model.action.exchange == node.model.to.exchange) {
-        let events = new Events()
+      if (endsOn.indexOf(node.model.action.exchange) > -1) {
+        let events = []
         let path = node.getPath()
         for (let n of path) {
-          log(n)
           let a = n.model.action
-          if (typeof a !== 'undefined') {
+          if (a) {
             a.id = n.model.id
             let event = new Event(a)
-            events.add(event)
+            events.push(event)
           }
         }
-        final.push(node)
-        transaction[node.model.id] = events
+        final[node.model.id] = events
       }
     }
   }
 
 //  log("total tree count "+countTotal+", passing "+countPassing)
-  final.sort((a,b) => 
-    a.model.wallet.valueMeanUSD(spreads) < b.model.wallet.valueMeanUSD(spreads) ? -1 :
-    a.model.wallet.valueMeanUSD(spreads) > b.model.wallet.valueMeanUSD(spreads) ? 1 : 0)
+  transactions = new Events(final)
+
+//  let tids = transaction.keysByProfit()
+//  tids.filter(tid => transaction.profit(tid) >= -50
 
 
       /*
@@ -394,9 +396,9 @@ let we = wallet.valueFirst()
 let fileName = "events.transfer."+process.pid+".json"
 if (opt.write)
   fileName = opt.write
-log("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
+log("writing file "+fileName+" containing "+transactions.keys().length + " transactions")
 var eventFile = fs.createWriteStream(fileName, { flags: 'w' }); 
-eventFile.write(JSON.stringify(transaction, null, 4))
+eventFile.write(JSON.stringify(transactions, null, 4))
 //}
 
 //  wallets.sort((a,b) => ((a.USD.value < b.USD.value) ? -1 : (a.USD.value > b.USD.value) ? 1 : 0))

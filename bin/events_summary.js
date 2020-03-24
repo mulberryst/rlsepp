@@ -34,7 +34,8 @@ console.trace = console.log
   let opt = stdio.getopt({
     'file': {key: 'f', args: 1},
     'tid': {key: 't', args: 1},
-    'notify': {key: 'n', args: 1}
+    'notify': {key: 'n', args: 1},
+    'profit': {key: 'p', args: 1}
   })
 
   let jsonevents = null
@@ -54,10 +55,12 @@ console.trace = console.log
   //    for (let tid in jsonevents) \
   let t = new Events(jsonevents)
 
-  log(t)
-
   let tids = t.keysByProfit()
-  tids.map( tag => t.print(tag) )
+
+  let profit = -50
+  if (opt.profit)
+    profit = Number(opt.profit)
+  tids.filter(tid => t.profit(tid) >= profit).map( tag => t.print(tag) )
 
   if (opt.notify) {
 
@@ -105,6 +108,8 @@ console.trace = console.log
             }
             log('storing event, book id: '+oid)
             let eid = await rl.store(ev, 'event')
+            log('stored event eid: '+eid + ' from transaction '+ev.transaction_tag)
+
             resolve(eid)
             } catch(e) {
               log(e)
