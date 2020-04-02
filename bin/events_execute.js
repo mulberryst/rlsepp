@@ -198,6 +198,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
             } while (!done)
           }
         } catch(e) {
+          log(e)
           rev = new Event(eeiT)
           rev.success = 0
           rev.info = {status:"failed", success:0, remaining: eeiT.amount, filled:0}

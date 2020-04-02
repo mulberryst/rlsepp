@@ -62,6 +62,8 @@ console.trace = console.log
     profit = Number(opt.profit)
   tids.filter(tid => t.profit(tid) >= profit).map( tag => t.print(tag) )
 
+  log("transaction count with a profit above "+profit+" "+tids.length)
+
   if (opt.notify) {
 
     let tweet = []
@@ -81,11 +83,12 @@ console.trace = console.log
       log("sending notification")
       console.log(subject.join(""))
       console.log(tweet.join("\n"))
-      await rl.notify(tweet.join("\n"),subject.join(","))
+      await rl.notify(opt.file+"\n"+tweet.join("\n"),subject.join(","))
     }
 
     let promises = []
-    t.correct()
+    t = rl.correctEvents(t)
+
     for (let tid of top) {
       let evs = t[tid]
 
@@ -99,18 +102,18 @@ console.trace = console.log
             //
             let oid = null
             try {
-            if (ev.orders) {
-              let book = new OrderBook(ev)
-              oid = await rl.store(book, 'orderbook')
+              if (ev.orders) {
+                let book = new OrderBook(ev)
+                oid = await rl.store(book, 'orderbook')
 
-              delete ev.orders
-              ev.orderbookid = oid
-            }
-            log('storing event, book id: '+oid)
-            let eid = await rl.store(ev, 'event')
-            log('stored event eid: '+eid + ' from transaction '+ev.transaction_tag)
+                delete ev.orders
+                ev.orderbookid = oid
+              }
+              log('storing event, book id: '+oid)
+              let eid = await rl.store(ev, 'event')
+              log('stored event eid: '+eid + ' from transaction '+ev.transaction_tag)
 
-            resolve(eid)
+              resolve(eid)
             } catch(e) {
               log(e)
               resolve(null)

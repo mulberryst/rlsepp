@@ -94,27 +94,27 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     //  use opt.amount scrubbed against balance for sale amount
     //
-    if (opt.sell && (opt.mock != null)) {
+    if (opt.sell) {
       if (opt.amount) {     
-        if (wallet.has(currency, exchange))
+        if (wallet.has(currency, exchange)) 
           wallet[exchange][currency].value = numberToString(opt.amount)
         else {
           log("or not")
           wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.amount)}))
         }
-      } else
+      } else if (opt.mock != null)
         Pamount = rl.marketsMinimumLimit(symbol, exchange)
     } 
     log(wallet)
 
     symbol = currency+"/"+currencyWith
-    if ((opt.mock != null) && opt.buy) {
+    if (opt.buy) {
       if (opt.cost) {
         if (wallet.has(currencyWith, exchange))
           wallet[exchange][currencyWith].value = numberToString(opt.cost)
         else
           wallet.add(new WalletEntry({currency:currencyWith, exchange:exchange, value: numberToString(opt.cost)}))
-      } else
+      } else if (opt.mock != null)
         Pamount = rl.marketsMinimumLimit(symbol, exchange)
     }
     //  tickers don't matter at all for prices
@@ -130,6 +130,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     if (opt.buy)
       [action, w] = rl.projectBuy(wallet, exchange, ticker, Pamount)
+
+    log(action)
 
     let events = new IxDictionary()
     events.set(exchange, new IxDictionary())
@@ -162,6 +164,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     let address = await rl.getDepositAddress(currency, exchange)
     log("address :" +address)
 
+    let action
+    let w
+    [action, w] = rl.projectTransfer(wallet, fromExchange, exchange, currency)
+    /*
     let e = new Event({
       action:"move",
       exchange:exchange,
@@ -174,12 +180,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       transaction_tag:opt.transaction,
       tid:null
     })
-
+*/
+    log("minimum limit on "+currency+"/"+opt.with + " at "+fromExchange)
+    log(JSON.stringify(rl.markets(currency+"/"+opt.with, fromExchange)))
     log(JSON.stringify(rl.marketsMinimumLimit(currency+"/"+opt.with, fromExchange)))
-    log(e)
+
     if (opt.transaction)
-      e.transaction_tag = opt.transaction
-    transaction = [e]
+      action[0].transaction_tag = opt.transaction
+    transaction = action
   } else {
     await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
     let spreads = rl.deriveSpreads( )
