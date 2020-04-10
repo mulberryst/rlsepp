@@ -13,6 +13,7 @@ const config = require('config')
   , asTableLog = require ('as-table').configure ({ title: x => x, delimiter: ' ', dash: '-' })
   , Rlsepp = require('librlsepp').Rlsepp
   , Event = require('librlsepp').Event
+  , Events = require('librlsepp').Events
   , Tickers = require('librlsepp').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
@@ -126,16 +127,23 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     let [action, w] = []
     if (opt.sell) {
       [action, w] = rl.projectSell(wallet, exchange, ticker,Pamount)
+      action.symbol = undefined
     }
 
-    if (opt.buy)
+    if (opt.buy) {
       [action, w] = rl.projectBuy(wallet, exchange, ticker, Pamount)
+      action.symbol = undefined
+    }
 
     log(action)
 
-    let events = new IxDictionary()
-    events.set(exchange, new IxDictionary())
-    events[exchange][symbol] = action
+    let events = new Events()
+
+    let now = new moment()
+    if (opt.transaction)
+      events.add([action], opt.transaction)
+    else 
+      events.add([action], action.action + " " +action.exchange + now.toISOString())
 
     //  TODO: when re-entrant, this disconnect on time/cache will be an issue
     //
