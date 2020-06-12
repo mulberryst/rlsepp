@@ -69,14 +69,20 @@ console.trace = console.log
     let tweet = []
     let subject = []
 
+    log("here?")
     tids = t.keysByProfit('desc')
 
     let topN = tids.slice(0,5)
 
+    log("here?")
     topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t.profit(tid) / t.costBasis(tid) * 1000))) ))
+    log("here?")
 
+    log("here?")
     let top = tids.filter(tid => t.profit(tid) >= Number(opt.notify))
+    log("here?")
     top.map( tid => tweet.push(t.asTweet(tid) ))
+    log("not here")
     //        await rl.notify(tweet.join("\n"),subject.join(","))
 
     if (tweet.length > 0 ) {
