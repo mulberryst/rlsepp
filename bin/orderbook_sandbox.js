@@ -92,9 +92,21 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       if (opt.tid && tid != opt.tid)
         continue 
 
+      log(tid)
       try {
         let lastAction = null
+        let t = null
         for (let event of jsonevents[fileno][tid]) {
+          if (t === null) {
+            t = event.transaction_tag
+          } else {
+            event.transaction_tag = t
+          }
+
+//  fixup bug in transferAction
+//  ensure all events have transfer action or Events constructor will filter
+//  
+          event.transaction_tag = t
 
           rl.applyExceptions(event)
           if (lastAction != null) {
@@ -109,12 +121,24 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
           }
           lastAction = event
         }
+        log(tid + " merged")
+        if (tid == "1007010001_coinbasepro") {
+          log(jsonevents[fileno][tid])
+  let eventFile4= fs.createWriteStream("events_test_data.json", { flags: 'w' });
+  eventFile4.write(JSON.stringify(jsonevents[fileno][tid]), null, 4)
+          log(new Events(jsonevents[fileno][tid]))
+        }
         events.merge(new Events(jsonevents[fileno][tid]))
       } catch(e) {
+//        log(tid)
+//        log(e)
         delete jsonevents[fileno][tid]
       }
     }
   }
+
+  let eventFile3= fs.createWriteStream("events.json", { flags: 'w' });
+  eventFile3.write(JSON.stringify(events, null, 4))
 
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
@@ -135,37 +159,42 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //  logger.info(util.inspect(books,true,true))
   logger.info("num books in memory returned from API: "+books.size())
 
-  let transaction = new IxDictionary()
+
+  //  adjustActions adds order books to events within transactions
+  //    (except "move") or throws
+  //
+  let rEv = new Events()
   for (let fileno in jsonevents) {
     for (let tid in jsonevents[fileno]) {
-      let lastAmount = null
 
       if (opt.tid && opt.tid != tid)
         continue
 
+//      log(jsonevents[fileno][tid])
+      let transaction = new Events()
+
       try {
-        let thisTransaction = rl.adjustActions(jsonevents[fileno][tid])
-        transaction[fileno + tid] = thisTransaction
+        let re = rl.adjustActions(jsonevents[fileno][tid])
+//        log(re)
+        transaction.add(re, tid)
+        rEv.merge(transaction)
       } catch(e) {
         logger.error(e)
-      }
-    }
+      }   
+    } 
   }
 
-  let ev = new Events(transaction)
-  logger.info("Events()" +ev.count())
-  ev = rl.correctEvents(ev)
-  logger.info("ev.correctEvents() " +ev.count())
+//  let ev = new Events(transaction)
+//  logger.info("Events()" +ev.count())
+//  ev = rl.correctEvents(ev)
+//  logger.info("ev.correctEvents() " +ev.count())
 
   let fileName = "events."+process.pid+".corrected.json"
   if (opt.write)
     fileName = opt.write
-  logger.info("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
+//  logger.info("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
   var eventFile= fs.createWriteStream(fileName, { flags: 'w' });
-  eventFile.write(JSON.stringify(transaction, null, 4))
-
-  let eventFile2= fs.createWriteStream("ev.json", { flags: 'w' });
-  eventFile2.write(JSON.stringify(ev, null, 4))
+  eventFile.write(JSON.stringify(rEv, null, 4))
 
 /*
   let count = 0
