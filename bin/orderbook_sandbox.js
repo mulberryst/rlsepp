@@ -154,7 +154,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let ev = new Events(transaction)
   logger.info("Events()" +ev.count())
-  ev = rl.correctEvents(ev)
+//  ev = rl.correctEvents(ev)
   logger.info("ev.correctEvents() " +ev.count())
 
   let fileName = "events."+process.pid+".corrected.json"
