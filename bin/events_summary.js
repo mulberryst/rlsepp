@@ -54,6 +54,7 @@ console.trace = console.log
   let table = []
   //    for (let tid in jsonevents) \
   let t = new Events(jsonevents)
+  let t2 = new Events(jsonevents)
 
   let tids = t.keysByProfit()
 
@@ -68,7 +69,7 @@ console.trace = console.log
   let top = tids.filter(tid => t.profit(tid) >= Number(opt.notify))
 
   let promises = []
-  t = rl.correctEvents(t)
+//  t = rl.correctEvents(t)
 
   let toss = []
 
@@ -96,11 +97,11 @@ console.trace = console.log
           }
           let eid = await rl.store(ev, 'event')
           log('stored event eid: '+eid + ' from transaction '+ev.transaction_tag)
-
           resolve(eid)
         } catch(e) {
           log(e)
-          toss.push(ev.transaction_tag)
+          if (!toss.includes(ev.transaction_tag))
+            toss.push(ev.transaction_tag)
           resolve(null)
         }
       }))
@@ -110,7 +111,6 @@ console.trace = console.log
 //  log(JSON.stringify(r))
 //  log(toss)
   for (let ttag of toss) {
-    log('delete '+ttag)
     await rl.storable.delete(ttag)
   }
   top = top.filter(t => !toss.includes(t));
@@ -122,9 +122,9 @@ console.trace = console.log
     let subject = []
 
     let topN = tids.slice(0,5)
-    topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t.profit(tid) / t.costBasis(tid) * 1000))) ))
+    topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t2.profit(tid) / t2.costBasis(tid) * 1000))) ))
 
-    top.map( tid => tweet.push(t.asTweet(tid) ))
+    top.map( tid => tweet.push(t2.asTweet(tid) ))
     //        await rl.notify(tweet.join("\n"),subject.join(","))
 
     if (tweet.length > 0 ) {
