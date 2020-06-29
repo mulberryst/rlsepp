@@ -69,7 +69,8 @@ console.trace = console.log
   let top = tids.filter(tid => t.profit(tid) >= Number(opt.notify))
 
   let promises = []
-//  t = rl.correctEvents(t)
+  t = rl.correctEvents(t)
+  t2 = rl.correctEvents(t2)
 
   let toss = []
 
