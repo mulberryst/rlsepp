@@ -5,7 +5,7 @@ const puppeteer = require('puppeteer')
 ;
 
 let outPath = "/home/nathaniel/src/git/rlsepp/data/yobit_wallets.html";
-let cookiesPath = '/home/nathaniel/src/git/rlsepp/config/puppeteer_cookiejar';
+let cookiesPath = '/home/nathaniel/src/git/rlsepp/config/puppeteer_cookiejar.json';
 let writeCookies = false;
 (async () => {
   const browser = await puppeteer.launch({
