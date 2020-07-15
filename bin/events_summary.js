@@ -33,7 +33,7 @@ console.trace = console.log
   let exchanges = []
   let opt = stdio.getopt({
     'file': {key: 'f', args: 1},
-    'tid': {key: 't', args: 1},
+//    'tid': {key: 't', args: 1},
     'notify': {key: 'n', args: 1},
     'profit': {key: 'p', args: 1}
   })

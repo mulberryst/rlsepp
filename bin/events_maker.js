@@ -42,8 +42,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let opt = stdio.getopt({
-    'file': {key: 'f', args: 1, 
-      description: "[file] input filename containing json flatfile containing an array of events"},
+    //    'file': {key: 'f', args: 1, description: "[file] input filename containing json flatfile containing an array of events"},
     'write': {key: 'w', args: 1, description: "[file] also output json flatfile of individual event(action)"},
     'sell': {args: 2, description: "[exchange,currency] (USD)"},
     'buy': {args: 2, description: "[exchange,currency] --with [currency (default) USD]"},
