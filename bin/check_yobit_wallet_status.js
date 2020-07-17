@@ -8,9 +8,13 @@ let outPath = "/home/nathaniel/src/git/rlsepp/data/yobit_wallets.html";
 let cookiesPath = '/home/nathaniel/src/git/rlsepp/config/puppeteer_cookiejar.json';
 let writeCookies = false;
 (async () => {
+  let headless = false;
+  if (writeCookies) {
+    headless = true;
+  }
   const browser = await puppeteer.launch({
-    headless: true,
-//    headless: false,
+//    headless: true,
+    headless: headless,
 //    slowMo: 250,
 //    dumpio: true,
     userDataDir: '/home/nathaniel/.config/puppeteerChrome'
@@ -44,7 +48,6 @@ let writeCookies = false;
     do {
       await sleep(5000);
       let cookies = await page.cookies();
-      await page.screenshot({ path: 'yobit_wallets_puppeteer.png', fullPage: true });
       let cookiesFile = fs.createWriteStream(cookiesPath, { flags: 'w' });
       cookiesFile.write(JSON.stringify(cookies, null, 4));
     } while (1)
