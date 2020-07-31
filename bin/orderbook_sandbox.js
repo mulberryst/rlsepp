@@ -37,7 +37,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let opt = stdio.getopt({
     'file': {key: 'f', mandatory:true, multiple: true},
     'write': {key: 'w', args: 1},
-    'tid': {key: 't', args: 1},
+//    'tid': {key: 't', args: 1},
     'dryrun': {args: 0}
   })
 
@@ -92,7 +92,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       if (opt.tid && tid != opt.tid)
         continue 
 
-      log(tid)
       try {
         let lastAction = null
         let t = null
@@ -121,7 +120,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
           }
           lastAction = event
         }
-        log(tid + " merged")
         if (tid == "1007010001_coinbasepro") {
           log(jsonevents[fileno][tid])
   let eventFile4= fs.createWriteStream("events_test_data.json", { flags: 'w' });
