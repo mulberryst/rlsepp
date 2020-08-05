@@ -71,6 +71,7 @@ console.trace = console.log
 
   tids = t.keysByProfit('desc')
   let top = tids.filter(tid => t.profit(tid) >= Number(opt.notify))
+  let storedTids = []
 
   let promises = []
   t = rl.correctEvents(t)
@@ -171,7 +172,7 @@ console.trace = console.log
             log(e)
             await dbh.query('ROLLBACK');
             dbh.release();
-            resolve(tid);
+            resolve(null);
             return;
             /*
           if (!toss.includes(ev.transaction_tag))
@@ -182,6 +183,7 @@ console.trace = console.log
         await dbh.query('COMMIT');
         dbh.release();
         storedEV += tranEV;
+        storedTids.push(tid)
         resolve(tid);
       }))
     }
@@ -200,10 +202,10 @@ console.trace = console.log
     let tweet = []
     let subject = []
 
-    let topN = tids.slice(0,5)
+    let topN = t2.keysByProfit('desc').filter(tid => storedTids.slice(0,5).includes(tid))
     topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t2.profit(tid) / t2.costBasis(tid) * 1000))) ))
 
-    top.map( tid => tweet.push(t2.asTweet(tid) ))
+    t2.keysByProfit('desc').filter(tid => storedTids.includes(tid)).map( tid => tweet.push(t2.asTweet(tid) ))
     //        await rl.notify(tweet.join("\n"),subject.join(","))
 
     if (tweet.length > 0 ) {
