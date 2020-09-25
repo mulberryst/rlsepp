@@ -479,8 +479,11 @@ let we = wallet.valueFirst()
   //  have correct events check against walletstatus and canTransfer
   ft = rl.correctEvents(ft);
 
-  log('applyExceptions');
   ft = rl.applyExceptionsEvents(ft)
+
+  ft = await rl.fetchDepositAddresses(ft);
+
+  log('applyExceptions');
   /*
   for (let n of final.keys()) {
       if (endsOn.indexOf(node.model.action.exchange) > -1) {
