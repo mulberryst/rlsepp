@@ -1,1 +1,13 @@
-/home/nathaniel/bin/update_transaction
+#!/bin/sh
+#
+
+cd /home/nathaniel/src/git/rlsepp
+DATE=`date +'%Y%m%d'`
+FILE=data/latest_by_profit_$DATE.json
+DUMP=data/latest_by_profit_"$DATE"_dump.json
+echo $FILE $DUMP
+node bin/dump_transaction.js -l -w $DUMP
+node bin/orderbook_sandbox.js -f $DUMP -w $FILE
+perl librlsepp/perl/delete_transaction.pl -c config/default.json -f $FILE
+node bin/market_minimum -f $FILE -w $FILE
+node bin/events_summary --profit 0 --notify 0 --subject "latest by profit summary" --file $FILE 
