@@ -32,7 +32,9 @@ const config = require('config')
   [''  , 'no-comment'],
   */
 let getopt = new Getopt([
+  ['d', 'delete', 'delete from dB'],
   ['t', 'transaction-tag=ARG', 'transaction tag'],
+  ['l', 'latest from profit view', 'latest'],
   ['w', 'write=ARG', 'file name to write output'],
   ['h' , 'help'                , 'display this help'],
   ['v' , 'version'             , 'show version']
@@ -51,7 +53,6 @@ getopt.setHelp(
   "Respository:  https://github.com/jiangmiao/node-getopt"
 );
 
-//getopt.showHelp();
 
 // process.argv needs slice(2) for it starts with 'node' and 'script name'
 // parseSystem is alias  of parse(process.argv.slice(2))
@@ -65,12 +66,37 @@ console.trace = console.log
   let opt = getopt.parse(process.argv.slice(2));
 //  console.info({argv: opt.argv, options: opt.options});
   log(opt.options)
+  if (typeof opt.options.t === 'undefined' && typeof opt.options.l === 'undefined') {
+    getopt.showHelp();
+    process.exit()
+  }
 
 
   let rl = Rlsepp.getInstance()
   await rl.initStorable()
 
-  let t = await rl.storable.retrieve({transaction_tag: opt.options.t}, 'transaction');
+  let t
+  if (opt.options.l) {
+    //let ev = await rl.storable.retrieve("select * from latest_moves_by_profit where latest > now() - interval '2 day' order by profit desc limit 10", 'stmt')
+    let ev = await rl.storable.retrieve("select * from latest_moves_by_profit where latest > now() - interval '2 day' order by profit desc", 'stmt')
+    let tags = []
+    for (let i in ev) {
+      let e = ev[i]
+      if (typeof e.transaction_tag !== 'undefined') 
+        tags.push(e.transaction_tag)
+    }
+//    log(tags)
+    t = await rl.storable.retrieve({transaction_tag: tags}, 'transaction');
+    /*
+    for (let i in t) {
+      let e = ev[i]
+      if (typeof e.transaction_tag !== 'undefined') 
+        tags.push(e.transaction_tag)
+    }
+*/
+  } else {
+    t = await rl.storable.retrieve({transaction_tag: opt.options.t}, 'transaction');
+  }
   /*
   let newT = new Events(t);
   let tag = opt.options.t
@@ -81,15 +107,18 @@ console.trace = console.log
     subid = Number(subid) + 1
   tag = id+"_"+endex+"_"+subid
 
-  for (let ev of t) {
-    ev.transaction_tag = tag
-    newT.add(ev, tag)
+  for (let tid in t) {
+    let tran = t[tid]
+    for (let ev of tran) {
+      ev.transaction_tag = tid
+    }
   }
+  log(t)
 */
-  let name = opt.options.w || 'dump_transaction.'+tag+'.json';
+
+  let name = opt.options.w || opt.options.t + '.json'|| 'latest_by_profit' +'.json';
   var eventFile= fs.createWriteStream( name, { flags: 'w' });
   eventFile.write(JSON.stringify(t, null, 4));
 
   log('wrote file '+name+' with '+t.count()+' events');
-
 })()

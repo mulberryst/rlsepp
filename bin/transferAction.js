@@ -297,7 +297,7 @@ let we = wallet.valueFirst()
 
       //from --file
       for (let name of endsOn) {
-        let leaf = rl.projectTransferTree(node.model.wallet.clone(), name, currency, node)
+        let leaf = await rl.projectTransferTree(node.model.wallet.clone(), name, currency, node)
         nodeCount++;
       }
 
@@ -477,11 +477,14 @@ let we = wallet.valueFirst()
   log('event count with USD value > (costBasis + 2)' + ft.count());
   log('correcting events');
   //  have correct events check against walletstatus and canTransfer
-  ft = rl.correctEvents(ft);
+  ft = await rl.correctEvents(ft);
 
+  // look for walletStatus of BCH on yobit
   ft = rl.applyExceptionsEvents(ft)
 
   ft = await rl.fetchDepositAddresses(ft);
+
+  ft = await rl.checkMoves(ft);
 
   log('applyExceptions');
   /*

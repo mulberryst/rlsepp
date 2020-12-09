@@ -32,6 +32,7 @@ console.trace = console.log
     ['', 'file=ARG', 'file'],
     ['', 'notify=ARG', 'send an email if profit above X'],
     ['' , 'profit=ARG', 'display of X'],
+    ['', 'subject=ARG', 'set custom email subject'], 
     ['' , 'skipDB'             , 'do not insert into dB']
   ]).bindHelp();              // create Getopt instance
 
@@ -59,24 +60,33 @@ console.trace = console.log
   let table = []
   //    for (let tid in jsonevents) \
   let t = new Events(jsonevents)
-  let t2 = new Events(jsonevents)
+
+  t = await rl.correctEvents(t)
+//  t = rl.fetchDepositAddresses(t)
+
+  let t2 = new Events()
+  for (let tid in t) {
+    t2.add(t[tid], tid)
+  }
 
   let tids = t.keysByProfit()
 
   let profit = -50
+  let notify = -50
   if (opt.profit)
     profit = Number(opt.profit)
+  if (opt.notify)
+    notify = Number(opt.notify)
   tids.filter(tid => t.profit(tid) >= profit).map( tag => t.print(tag) )
 
-
   tids = t.keysByProfit('desc')
-  let top = tids.filter(tid => t.profit(tid) >= Number(opt.notify))
+//  log(tids)
+//  process.exit()
+  let top = tids.filter(tid => t.profit(tid) >= notify)
+  top.map( tid => log(tid + " " + t.profit(tid)) )
   let storedTids = []
 
   let promises = []
-  t = rl.correctEvents(t)
-  t2 = rl.correctEvents(t2)
-
   let toss = []
 
   let storedEV = 0
@@ -87,7 +97,7 @@ console.trace = console.log
       let evs = t[tid]
 
       let tranEV = 0;
-      promises.push(new Promise(async (resolve, resject) => {
+      promises.push(new Promise(async (resolve, reject) => {
         let dbh = null
         do {
           try {
@@ -202,16 +212,19 @@ console.trace = console.log
     let tweet = []
     let subject = []
 
-    let topN = t2.keysByProfit('desc').filter(tid => storedTids.slice(0,5).includes(tid))
-    topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t2.profit(tid) / t2.costBasis(tid) * 1000))) ))
+    let topN = t2.keysByProfit('desc').filter(tid => storedTids.includes(tid)).slice(0,5)
+//    topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t2.profit(tid) / t2.costBasis(tid) * 1000))) ))
+    topN.map(tid => ( subject.push(sprintf("%0.0f ",Math.round( t2.profit(tid)))) ))
 
-    t2.keysByProfit('desc').filter(tid => storedTids.includes(tid)).map( tid => tweet.push(t2.asTweet(tid) ))
+    t2.keysByProfit('desc').filter(tid => storedTids.includes(tid)).map( tid => tweet.push(t2.asTweet(tid,rl) ))
     //        await rl.notify(tweet.join("\n"),subject.join(","))
 
     if (tweet.length > 0 ) {
       log("sending notification")
       console.log(subject.join(""))
       console.log(tweet.join("\n"))
+      if (opt.subject)
+        subject = [opt.subject]
       await rl.notify(opt.file+"\n"+tweet.join("\n"),subject.join(","))
     }
 

@@ -43,19 +43,24 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let opt = stdio.getopt({
     //    'file': {key: 'f', args: 1, description: "[file] input filename containing json flatfile containing an array of events"},
-    'write': {key: 'w', args: 1, description: "[file] also output json flatfile of individual event(action)"},
-    'sell': {args: 2, description: "[exchange,currency] (USD)"},
-    'buy': {args: 2, description: "[exchange,currency] --with [currency (default) USD]"},
+    'write': {key: 'w', args: 1, default:"events_maker.json", description: "[file] also output json flatfile of individual event(action)"},
+    'sell': {default:false, description: "[exchange,currency] (USD)"},
+    'buy': {default:false, description: "[exchange,currency] --with [currency (default) USD]"},
+    'move': {default:false, description: "[fromExchange, exchange, currency]"},
+    'exchange': {args:1, default: null, description: ""},
+    'fromExchange': {args:1,default: null, description: ""},
+    'currency': {args:1, default: null, description: ""},
     'with': {args: 1, default: "USD", description: "fiat / crypto currency to purchase with (default: USD)"},
     'for': {args: 1, default: "USD", 
         description: "[USD|EUR|BTC|DOGECOIN|...] fiat / crypto currency to sell for (default: USD)"},
-    'move': {args: 3, description: "[fromExchange, exchange, currency]"},
-    'amount': {args: 1, description: "[n] amount to move (if balances don't show currency)"},
-    'cost': {args: 1, description: "[n] amount of currency --with to spend on --buy"},
-    'mock': {args: 1, default: null,
+    'amount': {args: 1, default: -1, description: "[n] amount to move (if balances don't show currency)"},
+    'cost': {args: 1, default:-1, description: "[n] amount of currency --with to spend on --buy"},
+    'mock': {args: 1, default: false,
       description: "[null] mock (dry run) sell|buy|move operations performing safe guard checks, encapsulating entire transaction (by id or by --transaction #tag)"},
-    'transaction': {args: 1, descriptions: "transaction String #[tag]"}
+    'transaction': {args: 1, default:"events_maker", descriptions: "transaction String #[tag]"}
   })
+
+  log(opt)
 
   let rl = Rlsepp.getInstance()
   await rl.initStorable()
@@ -69,11 +74,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
     let [exchange,currency, currencyWith, currencyFor, amount] = []
 
-    if (opt.sell)
-      [exchange,currency] = opt.sell
-
-    if (opt.buy)
-      [exchange, currency] = opt.buy
+    exchange = opt.exchange
+    currency = opt.currency
 
     if (opt.with) // defaults: "USD"
       currencyWith = opt.with
@@ -95,7 +97,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     //  use opt.amount scrubbed against balance for sale amount
     //
     if (opt.sell) {
-      if (opt.amount) {     
+      if (opt.amount >= 0) {     
         if (wallet.has(currency, exchange)) 
           wallet[exchange][currency].value = numberToString(opt.amount)
         else {
@@ -108,8 +110,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     log(wallet)
 
     symbol = currency+"/"+currencyWith
+    log('symbol '+symbol)
     if (opt.buy) {
-      if (opt.cost) {
+      if (opt.cost > -1) {
         if (wallet.has(currencyWith, exchange))
           wallet[exchange][currencyWith].value = numberToString(opt.cost)
         else
@@ -147,14 +150,14 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     //  TODO: when re-entrant, this disconnect on time/cache will be an issue
     //
     let books = await rl.fetchOrderBooks(events, {store: false})
-    transaction = rl.adjustActions([action])
+    transaction = await rl.adjustActions([action])
     if (opt.transaction)
       transaction.map(e => {e.transaction_tag = opt.transaction})
 
     log(JSON.stringify(transaction))
 
   } else if (opt.move) {
-    let [fromExchange, exchange, currency] = opt.move
+    let [fromExchange, exchange, currency] = [opt.fromExchange, opt.exchange, opt.currency]
 
     let amount = numberToString(0)
 
@@ -163,17 +166,29 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let balances = await rl.showBalances(spreads)
 
     let wallet = balances
-    if ((opt.mock != null) && opt.amount)
+    if ((opt.mock != null) && opt.amount >= 0)
       amount = numberToString(opt.amount)
     if (wallet.has(currency, fromExchange) && (opt.mock == null))
       amount = numberToString(wallet[fromExchange][currency].value)
+
+    if (opt.amount >= 0) {
+        if (wallet.has(currency, exchange))
+          wallet[fromExchange][currency].value = numberToString(amount)
+        else
+          wallet.add(new WalletEntry({currency:currency, exchange:fromExchange, value: numberToString(amount)}))
+    }
 
     let address = await rl.getDepositAddress(currency, exchange)
     log("address :" +address)
 
     let action
     let w
-    [action, w] = rl.projectTransfer(wallet, fromExchange, exchange, currency)
+    try {
+      [action, w] = await rl.projectTransfer(wallet, fromExchange, exchange, currency)
+      log(action)
+    } catch(e) {
+      throw(e)
+    };
     /*
     let e = new Event({
       action:"move",
@@ -193,8 +208,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     log(JSON.stringify(rl.marketsMinimumLimit(currency+"/"+opt.with, fromExchange)))
 
     if (opt.transaction)
-      action[0].transaction_tag = opt.transaction
-    transaction = action
+      action.transaction_tag = opt.transaction
+    transaction = [action]
+  } else if (opt.file) {
+
   } else {
     await rl.initAsync(exchanges, {enableRateLimit: true, timeout:12500, retry: 5});
     let spreads = rl.deriveSpreads( )
@@ -208,6 +225,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   try {
     let ev = transaction[0]
     ev.created_by = 'events_maker'
+    ev.tagid = 1
 
     //  keep order book if one is embedded within
     //
@@ -228,7 +246,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
   }
 
-  if ((opt.sell || opt.buy || opt.move ) && opt.write) {
+  if ((opt.sell || opt.buy || opt.move || opt.file ) && opt.write) {
     let fileName = "events.maker."+eid+".json"
     if (opt.write)
       fileName = opt.write

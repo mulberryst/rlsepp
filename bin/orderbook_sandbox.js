@@ -135,8 +135,10 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     }
   }
 
-  let eventFile3= fs.createWriteStream("events.json", { flags: 'w' });
-  eventFile3.write(JSON.stringify(events, null, 4))
+  events = await rl.checkMoves(events)
+
+//  let eventFile3= fs.createWriteStream("events.json", { flags: 'w' });
+//  eventFile3.write(JSON.stringify(events, null, 4))
 
 //  let listAC = rl.arbitrableCommodities(['USDT'])
 //  let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])           
@@ -162,6 +164,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   //    (except "move") or throws
   //
   let rEv = new Events()
+
+
+  /*
   for (let fileno in jsonevents) {
     for (let tid in jsonevents[fileno]) {
 
@@ -172,7 +177,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       let transaction = new Events()
 
       try {
-        let re = rl.adjustActions(jsonevents[fileno][tid])
+        let re = await rl.adjustActions(jsonevents[fileno][tid])
 //        log(re)
         transaction.add(re, tid)
         rEv.merge(transaction)
@@ -181,10 +186,15 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       }   
     } 
   }
+*/
+
+  rEv = await rl.adjustActionsEvents(events)
 
 //  let ev = new Events(transaction)
 //  logger.info("Events()" +ev.count())
-  rEv = rl.correctEvents(rEv)
+  rEv = await rl.correctEvents(rEv)
+
+
 //  logger.info("ev.correctEvents() " +ev.count())
 
   let fileName = "events."+process.pid+".corrected.json"

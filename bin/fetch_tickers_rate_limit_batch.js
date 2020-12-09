@@ -31,7 +31,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   const rl = Rlsepp.getInstance();
   await rl.initStorable()
-  await rl.initAsync(exchanges, {enableRateLimit: false})
+  await rl.initAsync(exchanges, {enableRateLimit: true, fetchTickerMethod: 'fetchTickerV2', fetchMarketsMethod:'fetch_markets_from_api'})
 
   let dbTickers = rl.tickerByExchange
     //await rl.storable.retrieve(null, 'tickers')
@@ -82,7 +82,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
       //  yobit etc.. need a list for the call argument # limit
       //
-      if (rl.get(e).ccxt.has['fetchTickers']) {
+      if (rl.get(e).ccxt.has['fetchTickers'] && e != 'gemini') {
         if (batch.length > 0) {
           stats[0]++
           stats[1].push(batch.length)
@@ -126,6 +126,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       log(`fetched ${count} ticker symbols, stored ${stored} from ${name}, ${remain} remain`)
 
     }
-    await sleep(50)
+    await sleep(5)
   } while (tickers.size() > 0)
 })().then().catch(e => logger.error(e))

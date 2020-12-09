@@ -39,13 +39,14 @@ const {
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
+
 ;(async function main() {
 
   let opt = stdio.getopt({
     'file': {key: 'f', args: 1, default: "/dev/null", description:"filename containing json events"},
-    'eid': {key: 'e', args: 1, description:"event id as reported by events_maker"},
-    'dryrun': {args: 1, description:"peform a dry run of event"},
-    'transaction': {args: 1, description:"execute series of events marked by transaction tag"}
+    'eid': {key: 'e', args: 1, default: false, description:"event id as reported by events_maker"},
+    'dryrun': {args: 1, default:false, description:"peform a dry run of event"},
+    'transaction': {key: 't', args: 1, default: false, description:"execute series of events marked by transaction tag"}
   })
 
   let rl = Rlsepp.getInstance()
@@ -102,134 +103,251 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   //  let transaction = []
   for (let eid in events) {
     let ev = events[eid]
-    for (let eeiT of ev) {
 
-      // timing of cli script from start to this point was roughly 18.3 s on wifi
-      //  init takes up a good portion of this time
-      //
-      //    if (ev.age && ev.age > 20)
-      if (eeiT.age && eeiT.age > 1000000) {
-        if (!opt.dryrun) {
-          log(eeiT)
-          log("skipping old event, regen? ")
+    // if any event fails, fail the whole transaction
+    //
+    try {
+      for (let eeiT of ev) {
+        fs.writeFileSync(`/home/nathaniel/log/${eid}_${eeiT.tagid}_${eeiT.action}_event.log`,JSON.stringify(eeiT))
+        // timing of cli script from start to this point was roughly 18.3 s on wifi
+        //  init takes up a good portion of this time
+        //
+        //    if (ev.age && ev.age > 20)
+        if (eeiT.age && eeiT.age > 1000000) {
+          if (!opt.dryrun) {
+            log(eeiT)
+            log("skipping old event, regen? ")
 
-          continue
+            continue
+          }
         }
-      }
 
-      log("here")
-      //
-      //
-      if (eeiT.action == 'move') {
         log("here")
-        //    applyExceptions
-        //      
-        //      safeMoveMoneyAsync
 
-        let r 
+
         try {
-          r = await rl.moveMoneyAsync(
-            eeiT.amountType, eeiT.fromExchange, eeiT.exchange, eeiT.amount
-          )
-          log("was the call made?")
-          log(r)
-
-          let done = false
-          let stime = 1000
-          do {
-            await sleep(stime)
-            let verify = await rl.fetchBalances();
-            let search = verify.has(eeiT.amountType, eeiT.exchange)
-            log(search)
-            if (numberToString(search[eeiT.amountType].value) == numberToString(eeiT.amount))
-              done = true
-            else
-              stime = 5000
-          } while (!done)
+          await rl.storable.call('event_pending', null, eid, eeiT.tagid);
         } catch(e) {
           log(e)
         }
 
-        //TODO: store, tid?
-        log(r)
-      }
+        let fulfilled
+        let result
+        //
+        //
+        if (eeiT.action == 'move') {
+          log("here")
+          //    applyExceptions
+          //      
+          //      safeMoveMoneyAsync
 
-      let rev
-      // gemini does limit orders only according to the child class
-      //
-      if (eeiT.action == 'sell' || eeiT.action == 'buy') {
-        let book
-        try {
-          book = new OrderBook(eeiT)
-        } catch(e) {
+          let r 
           try {
-            book = await rl.retrieve({id:eeiT.orderbookid}, 'orderbook')
-          } catch(er) {
-            throw new Error(er)
-          }
-        }
 
-        try {
-          if (opt.dryrun) {
-            log("DRY RUN")
-            rev = new Event(eeiT)
-          } else {
-            rev = await rl.stickyOrder(eeiT, balances, book)
+            result = await rl.moveMoneyAsync(
+              eeiT.amountType, eeiT.fromExchange, eeiT.exchange, eeiT.amount - eeiT.cost
+            )
+            log("was the call made?")
+            log(result)
+            try {
+              //in result?
+              let txid = null
+              await rl.storable.call('event_began', null, eid, eeiT.tagid, 'open', null, txid,null, result);
+            } catch(e) {
+              log(e)
+            }
+            let fileName = `/home/nathaniel/log/${eid}_${eeiT.tagid}_${eeiT.action}_response.log`
+            fs.writeFileSync(fileName,result)
+
             let done = false
             let stime = 1000
+
+            //  let's see if they are uniform and keep the json {info:data, id:id} object
+            //
+            try {
+              if (result.id) {
+//                order = await rl.fetchOrder(result.id)
+//                let fileName = `/home/nathaniel/log/${eid}_${eeiT.tagid}_${eeiT.action}_move_status.log`
+//                fs.writeFileSync(fileName,order)
+              }
+
+            } catch(e) {
+              log(e)
+            }
+
             do {
               await sleep(stime)
-              let verify = await rl.fetchBalances([eeiT.exchange]);
-              let field
-              let value
-              if (eeiT.action == "buy")
-                [field, value] = [eeiT.amountType, eeiT.amount]
-              if (eeiT.action == "sell")
-                [field, value] = [eeiT.costType, eeiT.cost]
-
-              let orig = balances.has(field, eeiT.exchange)
-              let search = verify.has(field, eeiT.exchange)
-              log(orig)
-              log(search)
-              if (parseFloat(numberToString(search[field].value)) >= (parseFloat(orig[field].value) + parseFloat(numberToString(eeiT.amount))))
-                done = true
-              else
-                stime = 1250
+              let verify = await rl.showBalances(spreads,null, false);
+              log(verify)
+              let orig = balances.has(eeiT.amountType, eeiT.exchange)
+              let search = verify.has(eeiT.amountType, eeiT.exchange)
+              if (search) {
+                if (orig) {
+                  if (parseFloat(numberToString(verify[eeiT.exchange][field].value)) > (parseFloat(balances[eeiT.exchange][field].value)))
+                    done = true
+                  fulfilled = eeiT.amount
+                } else {
+                  done = true
+                }
+                stime = 5000
+              }
             } while (!done)
+          } catch(e) {
+            //[ExchangeNotAvailable] yobit POST https://yobit.net/tapi 500 Internal Server Error
+            throw e
           }
+
+        }
+
+        let rev
+        // gemini does limit orders only according to the child class
+        //
+        if (eeiT.action == 'sell' || eeiT.action == 'buy') {
+          let book
+          if (typeof eeiT.orderbookid !== 'undefined') {
+            try {
+              book = new OrderBook(eeiT)
+            } catch(e) {
+              try {
+                book = await rl.retrieve({id:eeiT.orderbookid}, 'orderbook')
+              } catch(er) {
+                throw new Error(er)
+              }
+            }
+          }
+
+          try {
+            if (opt.dryrun) {
+              log("DRY RUN")
+              rev = new Event(eeiT)
+            } else {
+              rev = await rl.stickyOrder(eeiT, balances, book)
+              result = rev.response
+        try {
+          await rl.storable.call('event_began', null, eid, eeiT.tagid, rev.status, rev.tid, null,null, result);
         } catch(e) {
           log(e)
-          rev = new Event(eeiT)
-          rev.success = 0
-          rev.info = {status:"failed", success:0, remaining: eeiT.amount, filled:0}
+        }
+              let done = false
+              let stime = 1000
+              let order = null
+              let lastOrder = null
+              do {
+                await sleep(stime)
+
+                //  check fetchOrder for status != 'open'
+                //
+                //  failing this, check showBalances for exchange.currency >= original.value + amount
+                //
+                try {
+/*
+                  690             'info': order,
+ 691             'id': order['id'].toString (),
+ 692             'timestamp': timestamp,
+ 693             'datetime': this.iso8601 (timestamp),
+ 694             'lastTradeTimestamp': undefined,
+ 695             'symbol': symbol,
+ 696             'type': orderType,
+ 697             'side': side,
+ 698             'price': this.safeFloat (order, 'price'),
+ 699             'average': this.safeFloat (order, 'avg_execution_price'),
+ 700             'amount': this.safeFloat (order, 'original_amount'),
+ 701             'remaining': this.safeFloat (order, 'remaining_amount'),
+ 702             'filled': this.safeFloat (order, 'executed_amount'),
+ 703             'status': status,
+ 704             'fee': undefined,
+*/
+                  if (rev.tid) {
+                    lastOrder = order
+                    log('attempting fetch order '+rev.tid)
+                    order = await rl.fetchOrder(eeiT.exchange, rev.tid)
+                    let fileName = `/home/nathaniel/log/${eid}_${eeiT.tagid}_${eeiT.action}_order_status.log`
+                    fs.appendFileSync(fileName,JSON.stringify(order))
+                    if (lastOrder == null || lastOrder.status != order.status || 
+                      lastOrder.remaining != order.remaining || lastOrder.filled != order.filled)
+                    if (order.status != 'open' || Number(order.remaining) == 0) {
+                      fulfilled = Number(order.fulfilled)
+                      done = true
+                    } else
+                      stime = 2000
+                  }
+
+                } catch(e) {
+                  log(e)
+
+                  //  fallback to using balances as verification
+
+                  let verify = await rl.showBalances(spreads,null, false);
+                  log(verify)
+                  let field
+                  let value
+                  if (eeiT.action == "buy")
+                    [field, value] = [eeiT.amountType, eeiT.amount]
+                  if (eeiT.action == "sell")
+                    [field, value] = [eeiT.costType, eeiT.cost]
+
+                  let orig = balances.has(field, eeiT.exchange)
+                  let search = verify.has(field, eeiT.exchange)
+
+                  if (search) {
+                    if (orig) { 
+//                    if (parseFloat(numberToString(verify[eeiT.exchange][field].value)) > (parseFloat(balances[eeiT.exchange][field].value) + parseFloat(numberToString(eeiT.amount))))
+                    //   failing fetchOrder, if the balance went up that's enough
+                      if (parseFloat(numberToString(verify[eeiT.exchange][field].value)) >= ((parseFloat(balances[eeiT.exchange][field].value) + Number(value)) ))
+                        done = true
+                    }
+                  } else
+                    stime = 1250
+                }
+              } while (!done)
+            }
+          } catch(e) {
+            throw e
+            rev = new Event(eeiT)
+            rev.success = 0
+            rev.info = {status:"failed", success:0, remaining: eeiT.amount, filled:0}
+          }
+
+          log(rev)
+          fs.writeFileSync(`/home/nathaniel/log/${eid}_${eeiT.tagid}_${eeiT.action}_response.log`,JSON.stringify(rev))
+          /*
+           *
+           replaced with stored proc event_complete
+          if (rev && rev.tid) {
+            try {
+              log("storing event transaction")
+              const r = await rl.store(rev, 'event')
+              log(r)
+            } catch(err) {
+              log(err)
+            }
+          }
+          */
+          //      transaction.push(rev)
+          //  check blockchain?
+          //
+          //  poll order book ( timeout after  n * 2(c(1s) + 200ms + ratelimit)  )
+          //    pause by rate limit
+          //    match action.orders against orderbook
+          //    if none match, expect complete
+          //
+          //  tid = cancel order
+          //  
+          //  loop over balance
+          //    match on cancel (=), match on price (<> stddev), re-calculate price
+          //  record ev in transactions
+          //
         }
 
-        log(rev)
-        if (rev && rev.tid) {
-          try {
-            log("storing event transaction")
-            const r = await rl.store(rev, 'event')
-            log(r)
-          } catch(err) {
-            log(err)
-          }
+        try {
+          await rl.storable.call('event_complete', null, eid, eeiT.tagid, 'closed', 0, fulfilled, null);
+        } catch(e) {
+          log(e)
         }
-        //      transaction.push(rev)
-        //  check blockchain?
-        //
-        //  poll order book ( timeout after  n * 2(c(1s) + 200ms + ratelimit)  )
-        //    pause by rate limit
-        //    match action.orders against orderbook
-        //    if none match, expect complete
-        //
-        //  tid = cancel order
-        //  
-        //  loop over balance
-        //    match on cancel (=), match on price (<> stddev), re-calculate price
-        //  record ev in transactions
-        //
-      }
-    }// for
+      }// for
+    } catch(e) {
+      log(e)
+    }
   }//for
 
     /*

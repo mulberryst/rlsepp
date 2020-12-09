@@ -1,6 +1,6 @@
 'use strict';
 const config = require('config')
-  , stdio = require('stdio')
+  , Getopt = require('node-getopt')
   , Rlsepp = require('librlsepp').Rlsepp
   , IxDictionary = require('librlsepp').IxDictionary
   , Spread = require('librlsepp').Spread
@@ -64,16 +64,17 @@ const sortBy = (array, key, descending = false) => {
   await rl.initStorable()
 
   let exchanges
-  let opt = stdio.getopt({
-    'write': {key: 'w', args: 1},
-    'min': {key:'m', args:1}
-  })
-  if (opt.args && opt.args.length > 0) {
-    exchanges = opt.args
-  } else {
+  let getopt = new Getopt([
+    ['m', 'min=ARG', 'minimum under 1000'],
+    ['w', 'write=ARG', 'file name to write output'],
+    ['h' , 'help'                , 'display this help'],
+    ['v' , 'version'             , 'show version']
+  ])              // create Getopt instance
+    .bindHelp();     // bind option 'help' to default action
+
+  let opt = getopt.parse(process.argv.slice(2)).options;
+
     exchanges = await rl.getCurrentTickerExchanges()
-    log(exchanges)
-  }
 
   await rl.initAsync(exchanges, {verbose});
 

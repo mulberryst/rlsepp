@@ -1,6 +1,6 @@
 'use strict';
 const config = require('config')
-  , stdio = require('stdio')
+  , Getopt = require('node-getopt')
   , fs = require("mz/fs")
   , path = require('path')
   , util = require('util')
@@ -16,6 +16,18 @@ const config = require('config')
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
 ;
+let getopt = new Getopt([
+  ['f', 'file=ARG', 'transaction file to draw from'],
+  ['t', 'tid=ARG', 'transaction'],
+  ['h' , 'help'                , 'display this help'],
+  ['v' , 'version'             , 'show version']
+])              // create Getopt instance
+.bindHelp();     // bind option 'help' to default action
+
+let opt = getopt.parse(process.argv.slice(2)).options;
+//  console.info({argv: opt.argv, options: opt.options});
+log(opt)
+
 
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
@@ -23,11 +35,6 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 ;(async function main() {
 
   let exchanges = []
-  let opt = stdio.getopt({
-    'file': {key: 'f', mandatory:true, multiple: true},
-    'write': {key: 'w', args: 1},
-    'tid': {key: 't', args: 1}
-  })
 
   let jsonevents = []
   let files = null
