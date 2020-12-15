@@ -58,7 +58,7 @@ getopt.setHelp(
   let result
 
   let dbTickers = rl.tickerByExchange
-  if (opt.options.n) {
+  if (opt.options.n || exchanges.indexOf('yobit') > -1) {
     for (let exchange of exchanges) {
       //await rl.storable.retrieve(null, 'tickers')
 
@@ -66,15 +66,19 @@ getopt.setHelp(
       // cross reference with whats in the database 
       // filling in epoch as missing datetimes
       //
+      let shuffle = []
       let symbols = []
-//      log(dbTickers[exchange])
+      //      log(dbTickers[exchange])
       rl.exchangeMarketSymbols(exchange).map(s => {
-//          if (dbTickers.has(exchange) && dbTickers[exchange].has(s)) {
-//            let bn = s.toLowerCase().split(/\//)
-//            symbols.push(bn.join('_'))
-            symbols.push(s)
-//          }
+        //          if (dbTickers.has(exchange) && dbTickers[exchange].has(s)) {
+        //            let bn = s.toLowerCase().split(/\//)
+        //            symbols.push(bn.join('_'))
+        shuffle.push({sort: Math.random(), value:s})
+        //          }
       })
+      symbols = shuffle.sort((a, b) => a.sort - b.sort)
+        .map((a) => a.value)
+
       let batch = []
 
       let len = 0
@@ -89,25 +93,25 @@ getopt.setHelp(
       batch = [...symbols.splice(0,count)]
 
       while (batch.length > 0) {
-       let result = [await rl.apiFetchTickers(exchange, batch)];
+        let result = [await rl.apiFetchTickers(exchange, batch)];
 
-  let tickers = new Tickers()
-  result.map(e => tickers.merge(e))
-//  log(JSON.stringify(tickers,null,4))
+        let tickers = new Tickers()
+        result.map(e => tickers.merge(e))
+        //  log(JSON.stringify(tickers,null,4))
 
-  for (let name in tickers) {
-    let [count,stored] = [0,0]
-    for (let ticker of tickers[name]) {
-      count++;
-      if (ticker.stored)
-        stored++
-    }
-    let remain = symbols.length
-    logger.info(`fetched ${count} ticker symbols, stored ${stored} from ${name}, ${remain} remaining`)
+        for (let name in tickers) {
+          let [count,stored] = [0,0]
+          for (let ticker of tickers[name]) {
+            count++;
+            if (ticker.stored)
+              stored++
+          }
+          let remain = symbols.length
+          logger.info(`fetched ${count} ticker symbols, stored ${stored} from ${name}, ${remain} remaining`)
 
-    //  var tickerFile = fs.createWriteStream('.tickers.json', { flags: 'w' });
-    //    tickerFile.write( JSON.stringify(tickers, null, 4) )
-  }
+          //  var tickerFile = fs.createWriteStream('.tickers.json', { flags: 'w' });
+          //    tickerFile.write( JSON.stringify(tickers, null, 4) )
+        }
         let len = 0
         let count = 0
         for (let s of symbols) {
@@ -128,7 +132,7 @@ getopt.setHelp(
 
   let tickers = new Tickers()
   result.map(e => tickers.merge(e))
-//  log(JSON.stringify(tickers,null,4))
+  //  log(JSON.stringify(tickers,null,4))
 
   for (let name in tickers) {
     let [count,stored] = [0,0]
@@ -144,8 +148,8 @@ getopt.setHelp(
   }
   let then = new moment()
   logger.info(' time taken '+moment.duration(now.diff(then)).as('seconds')+' seconds')
-/*  
+  /*  
   let listAC = rl.arbitrableCommodities(['USDT'])
   let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])
-*/
+  */
 })().then().catch(e => logger.error(e))
