@@ -40,16 +40,19 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   // cross reference with whats in the database 
   // filling in epoch as missing datetimes
   //
-  let r = []
+  let shuffle = []
   exchanges.map(name => {
     rl.exchangeMarketSymbols(name).map(s => {
 
       if (dbTickers.has(name) && dbTickers[name].has(s))
-        r.push(dbTickers[name][s])
+        shuffle.push({sort: Math.random(), value: dbTickers[name][s]})
       else 
-        r.push({symbol: s, exchange: name, datetime: new moment("1970-01-01T00:00:00Z").format()})
+        shuffle.push({sort: Math.random(), value: {symbol: s, exchange: name, datetime: new moment("1970-01-01T00:00:00Z").format()}})
     })
   })
+  let r = shuffle.sort((a, b) => a.sort - b.sort)
+    .map((a) => a.value)
+
   let tickers = new Tickers(r)
   let nPerE = new IxDictionary()
   tickers.keys().map( name => {
