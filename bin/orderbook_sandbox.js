@@ -16,6 +16,7 @@ const config = require('config')
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
   , Events = require('librlsepp/js/lib/event').Events
+  , PerExchangeCurrencyCollection = require('librlsepp/js/lib/perexchangecurrency').PerExchangeCurrencyCollection
   , log4js = require('log4js')
 ;
 
@@ -135,6 +136,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     }
   }
 
+//  log('idle connections in PgPool '+rl.storable.getPGA().handlePool.idleCount );
   events = await rl.checkMoves(events)
 
 //  let eventFile3= fs.createWriteStream("events.json", { flags: 'w' });
@@ -194,15 +196,18 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 //  logger.info("Events()" +ev.count())
   rEv = await rl.correctEvents(rEv)
 
+  let p
+  await rl.updateTickers(rEv)
 
 //  logger.info("ev.correctEvents() " +ev.count())
 
   let fileName = "events."+process.pid+".corrected.json"
   if (opt.write)
     fileName = opt.write
-//  logger.info("writing file "+fileName+" containing "+transaction.keys().length + " transactions")
+  logger.info("writing file "+fileName+" containing "+rEv.keys().length + " transactions")
   var eventFile= fs.createWriteStream(fileName, { flags: 'w' });
   eventFile.write(JSON.stringify(rEv, null, 4))
+
 
 /*
   let count = 0
