@@ -105,7 +105,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
           wallet.add(new WalletEntry({currency:currency, exchange:exchange, value: numberToString(opt.amount)}))
         }
       } else if (opt.mock != null)
-        Pamount = rl.marketsMinimumLimit(symbol, exchange)
+          throw 'must use --amount'
+//        Pamount = rl.marketsMinimumLimit(symbol, exchange)
     } 
     log(wallet)
 
@@ -118,7 +119,9 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
         else
           wallet.add(new WalletEntry({currency:currencyWith, exchange:exchange, value: numberToString(opt.cost)}))
       } else if (opt.mock != null)
-        Pamount = rl.marketsMinimumLimit(symbol, exchange)
+          throw 'must use --amount'
+
+//        Pamount = rl.marketsMinimumLimit(symbol, exchange)
     }
     //  tickers don't matter at all for prices
     //    only that the symbol is offered (which is also a guess at this point
