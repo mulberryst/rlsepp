@@ -84,7 +84,7 @@ let opt = stdio.getopt({
 });
 */
 let getopt = new Getopt([
-  ['b', 'balance', 'seed buys with all available with current balnces'],
+  ['b', 'costbasis', 'seed buys with 1k usd'],
   ['f', 'file=ARG', 'transaction file to draw from'],
   ['w', 'write=ARG', 'file name to write output'],
   ['h' , 'help'                , 'display this help'],
@@ -139,11 +139,17 @@ if (opt.to)
 
   let spreads = rl.deriveSpreads()
 
-let balance = await rl.showBalances(spreads)
 
-let wallet = balance;
-//log(wallet);
-  //let wallet = new Wallet(new WalletEntry(eobj));
+let balance
+let wallet
+
+if (opt.costbasis) {
+  wallet = new Wallet(new WalletEntry(eobj));
+} else {
+  balance = await rl.showBalances(spreads)
+  wallet = balance
+}
+  
 
 //let originalCoefficient = 1 / wallet[opt.from]['USD'].value
 
@@ -263,20 +269,41 @@ let we = wallet.valueFirst()
 
     transactions = new Events();
 
-    for (let exchange of wallet.exchanges()) {
-      for (let currency of wallet.currency(exchange)) {
 
-        for (let symbol of rl.exchangeMarketsHavingQuote(exchange, currency)) {
-          //      for (let e of rl.getCurrentTickerExchanges()) {
-          let ticker = rl.getTickerByExchange(exchange,symbol)
-          let eobj = {currency:currency, value: wallet.valueOf(currency, exchange), exchange:exchange}; 
-          let w = new Wallet(new WalletEntry(eobj))
+    if (opt.costbasis) {
+      for (let exchange of exchanges) {
+        log(exchange)
+let currency = 'USD'
+            let exchangess = rl.exchangeMarketsHavingQuote(exchange, currency)
+            for (let symbol of exchangess) {
+              let ticker = rl.getTickerByExchange(exchange,symbol)
+              log(ticker)
+                let eobj = {currency:currency, value: 1000, exchange:exchange}; 
+              let w = new Wallet(new WalletEntry(eobj))
 
-          let leaf = rl.projectBuyTree(w, exchange, ticker, treeNode)
-          nodeCount++;
+                let leaf = rl.projectBuyTree(w, exchange, ticker, treeNode)
+                nodeCount++;
+            }
+        }
+    } else {
+
+      for (let exchange of wallet.exchanges()) {
+        for (let currency of wallet.currency(exchange)) {
+          log(exchange + ' ' + currency)
+
+            let exchangess = rl.exchangeMarketsHavingQuote(exchange, currency)
+            for (let symbol of exchanges) {
+              //      for (let e of rl.getCurrentTickerExchanges()) {
+              let ticker = rl.getTickerByExchange(exchange,symbol)
+                let eobj = {currency:currency, value: wallet.valueOf(currency, exchange), exchange:exchange}; 
+              let w = new Wallet(new WalletEntry(eobj))
+
+                let leaf = rl.projectBuyTree(w, exchange, ticker, treeNode)
+                nodeCount++;
+            }
+            }
         }
       }
-    }
   }
 
   //////////
