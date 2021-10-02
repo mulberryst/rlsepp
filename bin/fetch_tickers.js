@@ -43,9 +43,12 @@ getopt.setHelp(
   //  console.info({argv: opt.argv, options: opt.options});
   log(opt.options)
 
-  let exchanges = config.get('exchanges')
+  let exchanges = []
   if (opt.argv && opt.argv.length > 0)
     exchanges = opt.argv
+  else
+    exchanges = config.get('exchanges')
+
 
   const rl = Rlsepp.getInstance();
   await rl.initStorable()

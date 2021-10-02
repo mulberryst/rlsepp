@@ -22,9 +22,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
   let opt = stdio.getopt({
   })
-  let exchanges = config.get('exchanges')
+  let exchanges = []
   if (opt.args && opt.args.length > 0) {
     exchanges = opt.args
+  } else {
+    exchanges = config.get('exchanges')
   }
 
   logger.info("initialzing "+exchanges.join(" "))
