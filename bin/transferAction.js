@@ -510,10 +510,10 @@ let currency = 'USD'
   // look for walletStatus of BCH on yobit
   ft = rl.applyExceptionsEvents(ft)
 
+  if (!'costbasis' in opt) {
   ft = await rl.fetchDepositAddresses(ft);
 
   
-  if (!'costbasis' in opt) {
     ft = await rl.checkMoves(ft);
   }
 
