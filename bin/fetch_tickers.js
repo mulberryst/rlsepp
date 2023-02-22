@@ -72,13 +72,12 @@ getopt.setHelp(
       let shuffle = []
       let symbols = []
       //      log(dbTickers[exchange])
-      rl.exchangeMarketSymbols(exchange).map(s => {
-        //          if (dbTickers.has(exchange) && dbTickers[exchange].has(s)) {
-        //            let bn = s.toLowerCase().split(/\//)
-        //            symbols.push(bn.join('_'))
-        shuffle.push({sort: Math.random(), value:s})
-        //          }
-      })
+	    rl.exchangeMarketSymbols(exchange).map(s => {
+		    if (dbTickers.has(name) && dbTickers[name].has(s))
+			    shuffle.push({sort: Math.random(), value: dbTickers[name][s]})
+		    else 
+			    shuffle.push({sort: Math.random(), value: new Ticker({symbol: s, exchange: name, datetime: new moment("1970-01-01T00:00:00Z").format()})})
+    })
       symbols = shuffle.sort((a, b) => a.sort - b.sort)
         .map((a) => a.value)
 
