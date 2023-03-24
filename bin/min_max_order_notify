@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 
 CMD=$0
 
@@ -39,7 +39,7 @@ fi
 
 #env NODE_PATH=$WD /usr/bin/node bin/show_arbitrage_cost --write data/events.minmax.$PID.json $PARAMS 2>&1 >> $LOGFILE
 
-env NODE_PATH=$WD /usr/bin/node bin/transferAction --write data/events.xfer.$PID.json $PARAMS 2>&1 >> $LOGFILE
+env NODE_PATH=$WD /usr/bin/node bin/transferAction --write data/events.xfer.$PID.json  -b -x "exmo kraken coinbaseprime gemini itbit bitstamp bitfinex" 2>&1 >> $LOGFILE
 
 while [ ! -e data/events.xfer.$PID.corrected.json ]; do
   env NODE_PATH=$WD /usr/bin/node bin/orderbook_sandbox --file data/events.xfer.$PID.json --write data/events.xfer.$PID.corrected.json $PARAMS 2>&1 >> $LOGFILE

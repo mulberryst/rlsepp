@@ -10,6 +10,7 @@ const config = require('config')
   , log = require ('ololog')
   , log4js = require('log4js')
   , Rlsepp = require('librlsepp').Rlsepp
+  , Ticker = require('librlsepp').Ticker
   , Tickers = require('librlsepp/js/lib/spread').Tickers
   , IxDictionary = require('librlsepp/js/lib/ixdictionary')
   , Storable = require('librlsepp/js/lib/storable').Storable
@@ -49,7 +50,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       if (dbTickers.has(name) && dbTickers[name].has(s))
         shuffle.push({sort: Math.random(), value: dbTickers[name][s]})
       else 
-        shuffle.push({sort: Math.random(), value: {symbol: s, exchange: name, datetime: new moment("1970-01-01T00:00:00Z").format()}})
+        shuffle.push({sort: Math.random(), value: new Ticker({symbol: s, exchange: name, datetime: new moment("1970-01-01T00:00:00Z").format()})})
     })
   })
   let r = shuffle.sort((a, b) => a.sort - b.sort)
@@ -58,7 +59,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   let tickers = new Tickers(r)
   let nPerE = new IxDictionary()
   tickers.keys().map( name => {
-    let s = tickers[name].size() 
+    let s = tickers[name].size 
     if (s > 512)
       nPerE[name] = 32
     else if (s < 25)
@@ -87,7 +88,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
       //  yobit etc.. need a list for the call argument # limit
       //
-      if (rl.get(e).ccxt.has['fetchTickers'] && e != 'gemini') {
+      if (rl.get(e).ccxt.has['fetchTickers'] == true) {
         if (batch.length > 0) {
           stats[0]++
           stats[1].push(batch.length)
@@ -126,11 +127,11 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
       for (let ticker of fetched[name]) {
         count++;
         if (ticker.stored) stored++
-        remain = tickers[name].size()
+        remain = tickers[name].size
       }
       log(`fetched ${count} ticker symbols, stored ${stored} from ${name}, ${remain} remain`)
 
     }
     await sleep(5)
-  } while (tickers.size() > 0)
+  } while (tickers.size > 0)
 })().then().catch(e => logger.error(e))

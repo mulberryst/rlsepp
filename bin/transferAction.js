@@ -85,6 +85,7 @@ let opt = stdio.getopt({
 */
 let getopt = new Getopt([
   ['b', 'costbasis', 'seed buys with 1k usd'],
+  ['x', 'exchanges=ARG', 'only use exchanges listed'],
   ['f', 'file=ARG', 'transaction file to draw from'],
   ['w', 'write=ARG', 'file name to write output'],
   ['h' , 'help'                , 'display this help'],
@@ -122,8 +123,9 @@ if (opt.to)
   //}
 
   let exchanges = rl.getCurrentTickerExchanges()
-  if (opt.exchange && opt.exchange.constructor == Array) {
-    exchanges = opt.exchange
+  if (opt.exchanges) {
+    exchanges = opt.exchanges.split(/ /);
+	  console.log(exchanges)
   }
 
 //  log(exchanges.join(" "))
@@ -277,7 +279,6 @@ let currency = 'USD'
             let exchangess = rl.exchangeMarketsHavingQuote(exchange, currency)
             for (let symbol of exchangess) {
               let ticker = rl.getTickerByExchange(exchange,symbol)
-              log(ticker)
                 let eobj = {currency:currency, value: 1000, exchange:exchange}; 
               let w = new Wallet(new WalletEntry(eobj))
 
@@ -509,9 +510,12 @@ let currency = 'USD'
   // look for walletStatus of BCH on yobit
   ft = rl.applyExceptionsEvents(ft)
 
+  if (!'costbasis' in opt) {
   ft = await rl.fetchDepositAddresses(ft);
 
-  ft = await rl.checkMoves(ft);
+  
+    ft = await rl.checkMoves(ft);
+  }
 
   log('applyExceptions');
   /*

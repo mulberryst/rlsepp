@@ -137,7 +137,8 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
   }
 
 //  log('idle connections in PgPool '+rl.storable.getPGA().handlePool.idleCount );
-  events = await rl.checkMoves(events)
+	console.log('uncomment checkMoves line 141!!')
+//  events = await rl.checkMoves(events)
 
 //  let eventFile3= fs.createWriteStream("events.json", { flags: 'w' });
 //  eventFile3.write(JSON.stringify(events, null, 4))
@@ -159,7 +160,7 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
 
 //  logger.info(util.inspect(books,true,true))
-  logger.info("num books in memory returned from API: "+books.size())
+  logger.info("num books in memory returned from API: "+books.size)
 
 
   //  adjustActions adds order books to events within transactions
