@@ -85,6 +85,7 @@ let opt = stdio.getopt({
 */
 let getopt = new Getopt([
   ['b', 'costbasis', 'seed buys with 1k usd'],
+  ['t', 'to=ARG', 'ends on exchange'],
   ['x', 'exchanges=ARG', 'only use exchanges listed'],
   ['f', 'file=ARG', 'transaction file to draw from'],
   ['w', 'write=ARG', 'file name to write output'],
@@ -104,8 +105,9 @@ if (opt.from)
 
 let beginsOn = []
 let endsOn = []
-if (opt.to)
+if (opt.to) {
   endsOn.push(opt.to)
+}
 
 
 //  if (opt.to) {} else throw new Error("--opt.to?")
@@ -325,8 +327,15 @@ let currency = 'USD'
 
       //from --file
       for (let name of endsOn) {
-        let leaf = await rl.projectTransferTree(node.model.wallet.clone(), name, currency, node)
+                  let w = new Wallet(node.model.wallet)
+	      let leaf;
+	      try {
+        leaf = await rl.projectTransferTree(w, name, currency, node)
+		      log('project transfer tree')
         nodeCount++;
+	      } catch(e) {
+		      log(e);
+	      };
       }
 
       //      }
@@ -400,6 +409,30 @@ let currency = 'USD'
   level *= 1000
   log("makes it to level "+level+", sell (nodeCount "+nodeCount+")")
 
+
+
+  for (let node of treeRoot.all(function (node) { 
+    return !node.hasChildren() })
+  ) {
+    let exchange = node.model.action.exchange
+    let currency = node.model.wallet.currencyFirst()
+    let value = node.model.wallet.valueOf(currency)
+	  if (!endsOn.includes(exchange)) {
+      for (let name of endsOn) {
+                  let w = new Wallet(node.model.wallet)
+	      let leaf;
+	      try {
+        leaf = await rl.projectTransferTree(w, name, currency, node)
+//	log('project transfer 2');
+        nodeCount++;
+	      } catch(e) {
+//	log('project transfer 2 fail');
+
+	      };
+      }
+	  }
+  }
+
   for (let node of treeRoot.all(function (node) { return node.model.id >= level })) {
     let currency = node.model.wallet.currencyFirst()
     let value = node.model.wallet.valueOf(currency)
@@ -408,7 +441,6 @@ let currency = 'USD'
       continue
 
     let exchange = node.model.action.exchange
-    //      for (let name of endsOn) {
     let w = new Wallet(new WalletEntry({currency:currency, value:value, exchange: exchange}))
 
     let symbol = currency+"/USD"
