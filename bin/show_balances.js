@@ -14,7 +14,7 @@ const config = require('config')
 var filename = path.basename(__filename);
 var logStdout = process.stdout;
 var logStderr = process.stderr;
-var logFile = fs.createWriteStream("/home/nathaniel/log/"+filename+'.log', { flags: 'w' }); 
+var logFile = fs.createWriteStream("/home/"+process.env['USER']+"/log/"+filename+'.log', { flags: 'w' }); 
 
 console.debug = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
 console.error = function () { logStderr.write(util.format.apply(null, arguments) + '\n'); };
@@ -36,7 +36,13 @@ Map.prototype.toJSON = function () {
   const rl = new RLSEPP();
   await rl.initStorable()
 
-  let exchanges = rl.getExchangesWithAPIKeys()
+  let apicreds = await rl.getAPICreds()
+  let exchanges = [];
+ 
+  for (let c of apicreds) {
+	  exchanges.push(c.exchange);
+  }
+
   await rl.initAsync(exchanges, {verbose, timeout:12500, retry: 5});
 
   let spreads = rl.deriveSpreads( )
