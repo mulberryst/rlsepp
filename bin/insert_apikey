@@ -1,7 +1,17 @@
 #!/bin/sh
 
-exchange=$1||'test'
-access=$2||'test'
+printUsage () {
+	echo $0 [exchange] [access]
+	echo
+	exit
+}
+
+exchange=$1
+access=$2
+if [ -z "$exchange" ] || [ -z "$access" ]; then
+	printUsage
+fi
+
 echo 'API key:'
 read key
 echo 'API secret:'
