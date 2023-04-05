@@ -1,0 +1,16 @@
+#!/bin/sh
+
+exchange=$1||'test'
+access=$2||'test'
+echo 'API key:'
+read key
+echo 'API secret:'
+read secret
+
+ echo "exhange: [$exchange] access type: [$access]  key: [$key]";
+
+export encsec=`echo $secret | gpg --encrypt --armor --recipient 'rlsepp'`
+ echo "insert into private.apicreds (exchange, access, key, secret) values ('$exchange','$access','$key','$encsec');"
+ psql -h db.grandstreet.group rlsepp -c "insert into private.apicreds (exchange, access, key, secret) values ('$exchange','$access','$key','$encsec') on conflict (exchange,access) do update set key=EXCLUDED.key, secret=EXCLUDED.secret, access=EXCLUDED.access;"
+#"copy private.apicreds (exchange, access, key, secret) FROM STDIN (FORMAT 'csv');"
+
