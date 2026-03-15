@@ -1,0 +1,43 @@
+#!/bin/sh
+
+#  wrapper for managing and executing cron jobs
+#
+#
+#make sure nvm use happened
+NODE=~/.nvm/versions/node/v24.14.0/bin/node
+WD=/home/nathaniel/src/git/rlsepp
+
+echo $* > /tmp/run_node
+
+cd $WD
+
+CMD=$1
+shift
+
+if [ "$CMD" == "setEnv" ]; then
+	CMD=$1
+	shift
+
+	RUNID=$(date +'%m%d%H%M')
+	LOG=/home/nathaniel/log/run_node.$RUNID.log
+	EV=$WD/data/events.xfer.$RUNID.json
+	EVC=$WD/data/events.xfer.$RUNID.corrected.json
+        echo "RUNID=$RUNID" > .cron_env
+        echo "LOG=$LOG" >> .cron_env
+        echo "EV=$EV" >> .cron_env
+        echo "EVC=$EVC" >> .cron_env
+
+	if [ -z "$CMD" ]; then
+		exit
+	fi
+fi
+. $WD/.cron_env
+echo "run_node BEGIN $RUNID $CMD" >> $LOG
+
+PARAMS="$PARAMS $*"
+shift
+
+#export NODE_ENV=
+#env NODE_PATH="$WD" /usr/bin/node bin/$CMD $PARAMS 2>&1 > /dev/null
+#env NODE_PATH="$WD/node_modules" /usr/bin/node bin/$CMD $PARAMS 2>&1 > /dev/null
+$NODE bin/$CMD $PARAMS 2>&1 >> $LOG

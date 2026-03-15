@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "ccxt": "file:librlsepp/js/node_modules/ccxt",
+    "ccxt/js/base/errors.js": "/home/nathaniel/src/npm/node_modules/ccxt/js/base/errors.js",
+    "librlsepp": "file:librlsepp"
+  }
+}

@@ -1,5 +1,6 @@
 'use strict';
-process.env.NODE_ENV='public'
+
+//process.env.NODE_ENV='public'
 const config = require('config')
   , fs = require("mz/fs")
   , path = require('path')
@@ -15,7 +16,7 @@ const config = require('config')
 
 let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
 
-const logger = log4js.getLogger('file');
+const logger = log4js.getLogger('screen');
 
 let getopt = new Getopt([
   ['h' , 'help'                , 'display this help'],
@@ -42,6 +43,7 @@ getopt.setHelp(
   let opt = getopt.parse(process.argv.slice(2));
   //  console.info({argv: opt.argv, options: opt.options});
   log(opt.options)
+  logger.debug('tickers begin')
 
   let exchanges = []
   if (opt.argv && opt.argv.length > 0)
@@ -49,13 +51,15 @@ getopt.setHelp(
   else
     exchanges = config.get('exchanges')
 
+  log('pre-init tickers from ['+exchanges.join('|')+']')
 
   const rl = Rlsepp.getInstance();
   await rl.initStorable()
+logger.info('debugging. post initStorable- pre initAsync');
   await rl.initAsync(exchanges, {enableRateLimit: true})
 
   let now = new moment()
-  logger.info('fetching/storing tickers from ['+exchanges.join('|')+']')
+  log('fetching/storing tickers from ['+exchanges.join('|')+']')
 
   let promises = []
   let result
@@ -109,7 +113,7 @@ getopt.setHelp(
               stored++
           }
           let remain = symbols.length
-          logger.info(`fetched ${count} ticker symbols, stored ${stored} from ${name}, ${remain} remaining`)
+          log(`fetched ${count} ticker symbols, stored ${stored} from ${name}, ${remain} remaining`)
 
           //  var tickerFile = fs.createWriteStream('.tickers.json', { flags: 'w' });
           //    tickerFile.write( JSON.stringify(tickers, null, 4) )
@@ -143,15 +147,15 @@ getopt.setHelp(
       if (ticker.stored)
         stored++
     }
-    logger.info(`fetched ${count} ticker symbols, stored ${stored} from ${name}`)
+    log(`fetched ${count} ticker symbols, stored ${stored} from ${name}`)
 
     //  var tickerFile = fs.createWriteStream('.tickers.json', { flags: 'w' });
     //    tickerFile.write( JSON.stringify(tickers, null, 4) )
   }
   let then = new moment()
-  logger.info(' time taken '+moment.duration(now.diff(then)).as('seconds')+' seconds')
+  log(' time taken '+moment.duration(now.diff(then)).as('seconds')+' seconds')
   /*  
   let listAC = rl.arbitrableCommodities(['USDT'])
   let table = await rl.fetchArbitrableTickers(listAC, ['USD', 'BTC', 'ETH'])
   */
-})().then().catch(e => logger.error(e))
+})().then().catch(e => log(e))

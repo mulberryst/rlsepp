@@ -1,5 +1,5 @@
 'use strict';
-process.env.NODE_ENV='public'
+//process.env.NODE_ENV='public'
 const config = require('config')
   , stdio = require('stdio')
   , fs = require("mz/fs")
@@ -30,10 +30,12 @@ let sleep = (ms) => new Promise (resolve => setTimeout (resolve, ms))
     exchanges = config.get('exchanges')
   }
 
-  logger.info("initialzing "+exchanges.join(" "))
+  log("initialzing "+exchanges.join(" "))
 
   const rl = Rlsepp.getInstance();
+log('pre init storable');
   await rl.initStorable()
+log('post init storable');
   await rl.initAsync(exchanges, {enableRateLimit: true, fetchTickerMethod: 'fetchTickerV2', fetchMarketsMethod:'fetch_markets_from_api'})
 
   let dbTickers = rl.tickerByExchange

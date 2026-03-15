@@ -7,8 +7,9 @@ shift
 PARAMS="$PARAMS $1"
 shift
 
-WD=/home/nathaniel/src/noscm/rlsepp
+WD=/home/nathaniel/src/rlsepp
 cd $WD
 #export NODE_ENV=
-env NODE_PATH="$WD" /usr/bin/node bin/$CMD $PARAMS 2>&1 > /dev/null
+#env NODE_PATH="$WD" /usr/bin/node bin/$CMD $PARAMS 2>&1 > /dev/null
+env NODE_PATH="$WD/node_modules" /usr/bin/node bin/$CMD $PARAMS 2>&1 > /dev/null
 
