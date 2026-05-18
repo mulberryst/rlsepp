@@ -1,0 +1,3 @@
+*.sql text diff=sql
+*.sql.gz diff=sql-gz binary
+*.dump binary diff=sql-dump
